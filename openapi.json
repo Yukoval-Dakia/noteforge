@@ -1,0 +1,1341 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "NoteForge draft API",
+  "version": "1.0",
+  "description": "Draft rhythm game charts for an editor. Times are ms on the uploaded audio's clock."
+ },
+ "paths": {
+  "/v1/health": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Health",
+    "description": "No token needed. `ready` means a draft can be generated.",
+    "operationId": "health_v1_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/capabilities": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Capabilities",
+    "description": "What a client can ask for, and the defaults.",
+    "operationId": "capabilities_v1_capabilities_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/audio": {
+   "post": {
+    "tags": [
+     "inputs"
+    ],
+    "summary": "Upload Audio",
+    "description": "Upload a song. The same file always gets the same `audio_id`, so its features are reused.",
+    "operationId": "upload_audio_v1_audio_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_audio_v1_audio_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/charts": {
+   "post": {
+    "tags": [
+     "inputs"
+    ],
+    "summary": "Upload Chart",
+    "description": "Upload a charter's chart (.osu for mania, RPE or official JSON or a package zip for Phira). Returns the timing and opening style found in it.",
+    "operationId": "upload_chart_v1_charts_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_upload_chart_v1_charts_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts": {
+   "post": {
+    "tags": [
+     "drafts"
+    ],
+    "summary": "Create Draft",
+    "description": "Start a draft. Takes minutes; poll `GET /v1/drafts/{id}`. The same request returns the existing draft unless it failed or was cancelled.",
+    "operationId": "create_draft_v1_drafts_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DraftRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}": {
+   "get": {
+    "tags": [
+     "drafts"
+    ],
+    "summary": "Get Draft",
+    "operationId": "get_draft_v1_drafts__draft_id__get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "drafts"
+    ],
+    "summary": "Cancel Draft",
+    "description": "Cancel a queued or running draft. A finished draft is not changed.",
+    "operationId": "cancel_draft_v1_drafts__draft_id__delete",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}/events": {
+   "get": {
+    "tags": [
+     "drafts"
+    ],
+    "summary": "Get Events",
+    "description": "The notes of a revision (latest by default), ready to load into an editor.",
+    "operationId": "get_events_v1_drafts__draft_id__events_get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "revision",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Revision"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}/sections": {
+   "get": {
+    "tags": [
+     "candidates"
+    ],
+    "summary": "Get Sections",
+    "description": "Alternatives per section, most agreeing first. Send a chosen `sample` back through `POST .../revisions`.\n\nThese are raw candidates: rhythm only, before clean-up and placement.",
+    "operationId": "get_sections_v1_drafts__draft_id__sections_get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "length_s",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "maximum": 120,
+       "minimum": 2,
+       "default": 16,
+       "title": "Length S"
+      }
+     },
+     {
+      "name": "start_s",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "minimum": 0,
+       "default": 0,
+       "title": "Start S"
+      }
+     },
+     {
+      "name": "end_s",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "exclusiveMinimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End S"
+      }
+     },
+     {
+      "name": "max_candidates",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 16,
+       "minimum": 1,
+       "default": 16,
+       "title": "Max Candidates"
+      }
+     },
+     {
+      "name": "include_notes",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": true,
+       "title": "Include Notes"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}/revisions": {
+   "post": {
+    "tags": [
+     "candidates"
+    ],
+    "summary": "Create Revision",
+    "description": "Make a new revision from vote or a sample: send every section choice together. Earlier revisions stay.",
+    "operationId": "create_revision_v1_drafts__draft_id__revisions_post",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RevisionRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}/continue": {
+   "post": {
+    "tags": [
+     "candidates"
+    ],
+    "summary": "Continue Draft",
+    "description": "Keep the notes before `from_ms` exactly and write the rest as a new revision. Much faster than a new draft: the audio is not read again and only the remaining sections run.",
+    "operationId": "continue_draft_v1_drafts__draft_id__continue_post",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ContinueRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/drafts/{draft_id}/chart": {
+   "get": {
+    "tags": [
+     "drafts"
+    ],
+    "summary": "Get Chart",
+    "description": "Download a playable chart file. `speed` is the Phira note speed.",
+    "operationId": "get_chart_v1_drafts__draft_id__chart_get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "revision",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Revision"
+      }
+     },
+     {
+      "name": "format",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Format"
+      }
+     },
+     {
+      "name": "speed",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "number",
+       "maximum": 100,
+       "exclusiveMinimum": 0,
+       "default": 10.0,
+       "title": "Speed"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "Aggregation": {
+    "type": "string",
+    "enum": [
+     "vote",
+     "single",
+     "most_agreeing"
+    ],
+    "title": "Aggregation"
+   },
+   "Base": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "vote",
+       "sample"
+      ],
+      "title": "Kind",
+      "default": "vote"
+     },
+     "sample": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sample"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "Base"
+   },
+   "Body_upload_audio_v1_audio_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file"
+    ],
+    "title": "Body_upload_audio_v1_audio_post"
+   },
+   "Body_upload_chart_v1_charts_post": {
+    "properties": {
+     "file": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "File"
+     },
+     "mode": {
+      "$ref": "#/components/schemas/Mode"
+     }
+    },
+    "type": "object",
+    "required": [
+     "file",
+     "mode"
+    ],
+    "title": "Body_upload_chart_v1_charts_post"
+   },
+   "Choice": {
+    "properties": {
+     "start_ms": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Start Ms"
+     },
+     "end_ms": {
+      "type": "number",
+      "exclusiveMinimum": 0.0,
+      "title": "End Ms"
+     },
+     "sample": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sample"
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/Note"
+        },
+        "type": "array",
+        "maxItems": 20000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notes",
+      "description": "The charter's finished notes for this section. Generated notes that collide with them give way"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "start_ms",
+     "end_ms"
+    ],
+    "title": "Choice",
+    "description": "One section: its notes are replaced by a sample's notes, or by the caller's own."
+   },
+   "ContinueRequest": {
+    "properties": {
+     "from_ms": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "From Ms"
+     },
+     "revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revision",
+      "description": "Revision to continue from; latest by default"
+     },
+     "seed": {
+      "type": "integer",
+      "maximum": 2147483647.0,
+      "minimum": 0.0,
+      "title": "Seed",
+      "description": "Change it to get a different continuation",
+      "default": 1
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "from_ms"
+    ],
+    "title": "ContinueRequest",
+    "description": "Keep everything before from_ms and write the rest. The audio is not read again."
+   },
+   "CurvePoint": {
+    "properties": {
+     "start_s": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Start S"
+     },
+     "end_s": {
+      "type": "number",
+      "exclusiveMinimum": 0.0,
+      "title": "End S"
+     },
+     "density": {
+      "type": "number",
+      "maximum": 60.0,
+      "minimum": 0.0,
+      "title": "Density",
+      "description": "Notes per second"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "start_s",
+     "end_s",
+     "density"
+    ],
+    "title": "CurvePoint"
+   },
+   "DraftRequest": {
+    "properties": {
+     "audio_id": {
+      "type": "string",
+      "title": "Audio Id"
+     },
+     "mode": {
+      "$ref": "#/components/schemas/Mode"
+     },
+     "level": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 60.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Level",
+      "description": "Overall notes per second. Required on Phira."
+     },
+     "timing": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Timing"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "opening_chart_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Opening Chart Id",
+      "description": "The charter's chart of at least the opening: style comes from its first 30 s"
+     },
+     "style": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Style"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "density_curve": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/CurvePoint"
+        },
+        "type": "array",
+        "maxItems": 20000,
+        "minItems": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Density Curve",
+      "description": "Replaces the planned curve"
+     },
+     "aggregation": {
+      "$ref": "#/components/schemas/Aggregation",
+      "default": "vote"
+     },
+     "samples": {
+      "type": "integer",
+      "maximum": 16.0,
+      "minimum": 1.0,
+      "title": "Samples",
+      "description": "Also the number of candidates available per section",
+      "default": 8
+     },
+     "profile": {
+      "type": "string",
+      "enum": [
+       "relaxed",
+       "standard",
+       "expert",
+       "none"
+      ],
+      "title": "Profile",
+      "description": "Phira playability limits",
+      "default": "standard"
+     },
+     "seed": {
+      "type": "integer",
+      "maximum": 2147483647.0,
+      "minimum": 0.0,
+      "title": "Seed",
+      "default": 0
+     },
+     "plan": {
+      "type": "string",
+      "enum": [
+       "balanced",
+       "fast",
+       "sequential"
+      ],
+      "title": "Plan",
+      "description": "m3 backend only. balanced: 3 parallel rounds, quality matched the frozen setup on 100 songs. fast: 2 rounds, quicker, mania likeness fell clearly. sequential: core by core, the slowest",
+      "default": "balanced"
+     },
+     "title": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "artist": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Artist"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "audio_id",
+     "mode"
+    ],
+    "title": "DraftRequest"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "Mode": {
+    "type": "string",
+    "enum": [
+     "phira",
+     "mania_4k"
+    ],
+    "title": "Mode"
+   },
+   "Note": {
+    "properties": {
+     "time_ms": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Time Ms"
+     },
+     "end_ms": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "End Ms"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "tap",
+       "hold",
+       "flick",
+       "drag"
+      ],
+      "title": "Type"
+     },
+     "lane": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 3.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lane",
+      "description": "mania_4k"
+     },
+     "x": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "X",
+      "description": "Phira position; left out to let the model place it"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "time_ms",
+     "end_ms",
+     "type"
+    ],
+    "title": "Note"
+   },
+   "RevisionRequest": {
+    "properties": {
+     "base": {
+      "$ref": "#/components/schemas/Base",
+      "default": {
+       "kind": "vote"
+      }
+     },
+     "choices": {
+      "items": {
+       "$ref": "#/components/schemas/Choice"
+      },
+      "type": "array",
+      "maxItems": 2000,
+      "title": "Choices"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "RevisionRequest"
+   },
+   "Segment": {
+    "properties": {
+     "start_ms": {
+      "type": "number",
+      "title": "Start Ms",
+      "description": "Red line time on the audio clock, ms"
+     },
+     "bpm": {
+      "type": "number",
+      "maximum": 2000.0,
+      "exclusiveMinimum": 0.0,
+      "title": "Bpm"
+     },
+     "meter": {
+      "type": "integer",
+      "maximum": 32.0,
+      "minimum": 1.0,
+      "title": "Meter",
+      "default": 4
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "start_ms",
+     "bpm"
+    ],
+    "title": "Segment"
+   },
+   "Style": {
+    "properties": {
+     "hold": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hold"
+     },
+     "chord": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chord"
+     },
+     "flick": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flick",
+      "description": "Phira only"
+     },
+     "drag": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Drag",
+      "description": "Phira only"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "Style",
+    "description": "Requested shares, 0 to 1. Anything left out comes from opening_chart_id, then from the planner."
+   },
+   "Timing": {
+    "properties": {
+     "segments": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/Segment"
+        },
+        "type": "array",
+        "maxItems": 2000,
+        "minItems": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Segments"
+     },
+     "bpm": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 2000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bpm"
+     },
+     "chart_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Chart Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "Timing",
+    "description": "Exactly one of: full segments, a BPM (the beat phase is found automatically), or an uploaded chart."
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Large main weights are distributed as a GitHub Release asset (see models/MANIFEST.json).
+# Small auxiliary weights are committed on purpose.
+*.pt
+!noteforge/placement/placement3.pt
+!models/planner_f/*.pt
+*.pth
+*.safetensors
+*.onnx
+
+# Generated features, audio, charts, and local artifacts are not source.
+data/
+charts/
+*.npz
+*.npy
+!models/planner_f/*.npz
+*.mp3
+*.wav
+*.ogg
+*.flac
+*.pez
+*.osz
+*.osz.tmp
+out/
+dist/
+build/
+
+# Local config and secrets
+.env
+*.local.json
+secrets/
+
+# OS
+.DS_Store

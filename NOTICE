@@ -1,0 +1,32 @@
+NoteForge third-party attribution
+
+This repository contains original code and model weights created for NoteForge.
+It also depends on or adapts work from the following projects. Their licenses
+govern those components; they do not relicense this repository's own code.
+
+Audio frontend
+- PupuM2D (sizigi/PupuM2D), MIT License. The mel front-end recipe in
+  noteforge/audio/preprocess.py follows the published PupuM2D magnitude
+  log-mel contract (24 kHz, periodic Hann window, Slaney mel filter).
+- MERT-v2-FullSong (m-a-p/MERT-v2-FullSong on Hugging Face), Apache-2.0.
+  noteforge/audio/mert2.py loads the pinned revision
+  7001f7657276238629e61c7746ce70735e0604c0 and verifies the local snapshot by
+  SHA-256. The encoder weights are NOT distributed in this repository; users
+  supply them locally.
+
+Derived routines
+- The Slaney mel-filter routine follows librosa 0.11.0 (ISC License).
+- timm EVA / AttentionRope / RoPE / SwiGLU reference implementations were
+  consulted from huggingface/pytorch-image-models v1.0.22 (Apache-2.0). No
+  timm source is vendored.
+
+Chart formats
+- Phira (.pez/.rpe) and osu!mania (.osu/.osz) parsing and export are original
+  implementations against the public file formats.
+
+The published r5 model weights, small planner weights and placement weights are
+original NoteForge components under MIT; the main r5 weights are distributed as
+a GitHub Release asset (see models/MANIFEST.json for their SHA-256). No audio or
+chart corpus is distributed. Chart and audio content remain the property of
+their respective authors; code licenses do not grant redistribution or
+training rights over third-party charts or audio.

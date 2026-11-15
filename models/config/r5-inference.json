@@ -1,0 +1,10 @@
+{
+  "counterfactual_cell_us": 100000,
+  "id": "r5-inference",
+  "mel_normalization": {
+    "coefficient_sha256": "412b298fe2214a3843252677d3907363444963d0f4cb810d46ab89ef9bf3961d",
+    "path": "models/config/mel-statistics.json",
+    "sha256": "75a057dde89e8bd16102dddc00f8d2a7cf4ad065693557847d0d14db89255b4c"
+  },
+  "note": "Inference-only contract for the frozen r5 model."
+}

@@ -1,0 +1,8 @@
+# Core inference engine.
+torch>=2.5
+numpy>=1.26
+# Pinned MERT-v2 frontend (see noteforge/audio/mert2.py).
+transformers==4.53.2
+safetensors>=0.4
+# Phira chart parsing (noteforge/events/phira.py).
+pyyaml>=6.0

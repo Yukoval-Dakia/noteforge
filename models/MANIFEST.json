@@ -1,0 +1,54 @@
+{
+  "checkpoint_schema": "noteforge.finalmodelv1",
+  "download_url": "https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt",
+  "files": [
+    {
+      "bytes": 1287035061,
+      "path": "models/noteforge-r5.pt",
+      "sha256": "1b1f2e8dee82101690778ef667b661fa1d88421f50034c0bd97572f3067d405b"
+    },
+    {
+      "bytes": 4975,
+      "path": "models/config/mel-statistics.json",
+      "sha256": "75a057dde89e8bd16102dddc00f8d2a7cf4ad065693557847d0d14db89255b4c"
+    },
+    {
+      "bytes": 379,
+      "path": "models/config/r5-inference.json",
+      "sha256": "c37d1150594320e2b9e7a8ddb776c66191284e4819855ef11bd2b8b610d16929"
+    },
+    {
+      "bytes": 3257058,
+      "path": "noteforge/placement/placement3.pt",
+      "sha256": "b1d8efde95e4ad52de3a38cd549eee792c2944be17549ad8323f5e7f57d01bc1"
+    },
+    {
+      "bytes": 1804,
+      "path": "models/planner_f/norm.npz",
+      "sha256": "ddb9d6668ed954272d4f8024aa98630e9add948b4e0fed708ddee34c82d20068"
+    },
+    {
+      "bytes": 528888,
+      "path": "models/planner_f/pca.npz",
+      "sha256": "259b288cf3dc225f8bdc0720dff60dab2d473a6260ab8db909cdafdf8bcfe875"
+    },
+    {
+      "bytes": 460317,
+      "path": "models/planner_f/planner_f_mania_4k.pt",
+      "sha256": "338a4cf1b6d12733ffd67e87a8ad1cd4029c00aa390e3c25e8f7718fc85895c5"
+    },
+    {
+      "bytes": 460230,
+      "path": "models/planner_f/planner_f_phira.pt",
+      "sha256": "8124a526069c952fb9ffca70f8f38e7889deb4780fd1fa5a9db15b95c46e9d85"
+    }
+  ],
+  "license": "MIT",
+  "main_weights": "models/noteforge-r5.pt",
+  "mel_coefficient_sha256": "412b298fe2214a3843252677d3907363444963d0f4cb810d46ab89ef9bf3961d",
+  "model": "r5",
+  "note": "Main weights are distributed as a GitHub Release asset; all other weights are committed in this repository.",
+  "parameters": 321726983,
+  "schema": "noteforge.model-manifest.v1",
+  "weights": "ema"
+}

@@ -1,0 +1,5 @@
+# API process. The generation engine runs in its own Python (NOTEFORGE_ENGINE_PYTHON) with torch.
+-r requirements.txt
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-multipart>=0.0.9
