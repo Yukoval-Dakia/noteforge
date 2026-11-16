@@ -49,6 +49,20 @@ jobs:
                 --out-dir "results/t${threads}-r${run}" >> results.jsonl
             done
           done
+      - name: Measure the numerical paths at 2 threads
+        run: |
+          for run in $(seq 0 $(( ${{ inputs.runs }} - 1 ))); do
+            python -m noteforge.scripts.bench_backends \
+              --backend torch --device cpu --cpu-threads 2 --cpu-interop-threads 1 \
+              --audio bench/silence.wav --features-dir bench --mode phira --level 10 \
+              --batch-size 64 --scheduler grouped --runs 1 --autocast bf16 \
+              --out-dir "results/bf16-r${run}" >> results-bf16.jsonl
+            python -m noteforge.scripts.bench_backends \
+              --backend torch --device cpu --cpu-threads 2 --cpu-interop-threads 1 \
+              --audio bench/silence.wav --features-dir bench --mode phira --level 10 \
+              --batch-size 64 --scheduler grouped --runs 1 --reference-decode \
+              --out-dir "results/ref-r${run}" >> results-reference.jsonl
+          done
       - name: Summarize
         run: |
           python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
@@ -72,3 +86,5 @@ jobs:
           path: |
             host.txt
             results.jsonl
+            results-bf16.jsonl
+            results-reference.jsonl
