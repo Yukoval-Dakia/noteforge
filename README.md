@@ -19,11 +19,11 @@ NoteForge 给一首歌生成可编辑的节奏谱草稿：Phira / Phigros 风格
 
 ## 权重下载
 
-`models/noteforge-r5.pt` 约 1.2 GB，作为 [v1.0.0 Release 资产](https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt) 发布：
+`models/noteforge-r5.pt` 约 1.2 GB，作为 [v1.2.0 Release 资产](https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.2.0/noteforge-r5.pt) 发布。同一份权重的 v1.0.0 资产继续保留其原始 MIT 授权：
 
 ```bash
 curl -L -o models/noteforge-r5.pt \
-  https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt
+  https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.2.0/noteforge-r5.pt
 shasum -a 256 models/noteforge-r5.pt
 # 1b1f2e8dee82101690778ef667b661fa1d88421f50034c0bd97572f3067d405b
 ```
@@ -222,6 +222,8 @@ python -m noteforge.scripts.bench_backends \
 
 ## 许可证与归属
 
-仓库代码、随仓小权重和发布的 r5 主权重采用 MIT License，见 `LICENSE`。第三方组件及许可见 `NOTICE`：PupuM2D（MIT）、librosa（ISC）、timm 参考实现（Apache-2.0）。MERT-v2-FullSong 是例外：仓库只包含加载它的代码，不分发其权重；上游固定 revision 的权重许可是 **CC BY-NC 4.0（非商用）**，不是 Apache-2.0，需要 MERT 的运行因此仅限非商用。第三方谱面和音频不在本仓库，也不因代码许可获得再分发或训练授权。
+从 NoteForge 1.2.0 起，仓库代码、CLI、HTTP API、文档、随仓小权重和发布的 r5 主权重采用 **Apache License 2.0**，见 [`LICENSE`](LICENSE)。`v1.1.1` 及更早版本继续按其当时的 MIT 授权提供；已经授予的 MIT 权利不会被后续版本撤销。完整范围见 [`LICENSING.md`](LICENSING.md)。
+
+第三方组件及许可见 [`NOTICE`](NOTICE)：PupuM2D（MIT）、librosa（ISC）、timm 参考实现（Apache-2.0）。MERT-v2-FullSong 保持独立：仓库只包含加载它的代码，不分发其权重；上游固定 revision 的权重许可是 **CC BY-NC 4.0（非商用）**。NoteForge 或 r5 的 Apache-2.0 不会重新授权 MERT，需要 MERT 的运行因此仍仅限非商用。第三方谱面和音频不在本仓库，也不因代码许可获得再分发或训练授权。
 
 训练方法、训练代码、语料和内部评测不属于本开源发布范围。

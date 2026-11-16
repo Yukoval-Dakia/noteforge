@@ -1,4 +1,10 @@
-NoteForge third-party attribution
+NoteForge
+Copyright 2026 NoteForge contributors
+
+NoteForge is licensed under the Apache License, Version 2.0 (see LICENSE).
+Releases through v1.1.1 remain available under their original MIT grant.
+
+Third-party attribution
 
 This repository contains original code and model weights created for NoteForge.
 It also depends on or adapts work from the following projects. Their licenses
@@ -18,7 +24,9 @@ Audio frontend
   from the upstream repository and supply them locally. Because those weights
   are non-commercial, NoteForge releases that require MERT are for
   non-commercial use only. The published r5 checkpoint is an original NoteForge
-  artifact under MIT; its own license does not relicense MERT.
+  artifact under Apache-2.0 from v1.2.0; its own license does not relicense
+  MERT. The v1.0.0 r5 Release was previously published under MIT, and those
+  rights remain valid.
 
 Derived routines
 - The Slaney mel-filter routine follows librosa 0.11.0 (ISC License).
@@ -31,8 +39,8 @@ Chart formats
   implementations against the public file formats.
 
 The published r5 model weights, small planner weights and placement weights are
-original NoteForge components under MIT; the main r5 weights are distributed as
-a GitHub Release asset (see models/MANIFEST.json for their SHA-256). No audio or
-chart corpus is distributed. Chart and audio content remain the property of
-their respective authors; code licenses do not grant redistribution or
-training rights over third-party charts or audio.
+original NoteForge components licensed under Apache-2.0 from v1.2.0; the main
+r5 weights are distributed as a GitHub Release asset (see models/MANIFEST.json
+for their SHA-256). No audio or chart corpus is distributed. Chart and audio
+content remain the property of their respective authors; code licenses do not
+grant redistribution or training rights over third-party charts or audio.

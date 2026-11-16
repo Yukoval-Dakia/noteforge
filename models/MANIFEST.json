@@ -1,6 +1,6 @@
 {
   "checkpoint_schema": "noteforge.finalmodelv1",
-  "download_url": "https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt",
+  "download_url": "https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.2.0/noteforge-r5.pt",
   "files": [
     {
       "bytes": 1287035061,
@@ -43,7 +43,7 @@
       "sha256": "8124a526069c952fb9ffca70f8f38e7889deb4780fd1fa5a9db15b95c46e9d85"
     }
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main_weights": "models/noteforge-r5.pt",
   "mel_coefficient_sha256": "412b298fe2214a3843252677d3907363444963d0f4cb810d46ab89ef9bf3961d",
   "model": "r5",

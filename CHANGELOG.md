@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0
+
+- Changed current and future NoteForge releases to Apache-2.0. The license
+  covers the source code, CLI, HTTP API, documentation, planner and placement
+  weights, and NoteForge's distributed model weights. Apache-2.0 adds an
+  explicit patent grant and patent-retaliation terms.
+- Re-published the unchanged r5 weights as a v1.2.0 Release asset under
+  Apache-2.0. The earlier v1.0.0 copy remains available under its original MIT
+  grant.
+- Kept releases through v1.1.1 under their original MIT grant. A later license
+  change cannot revoke rights already granted for those released copies.
+- Kept the upstream MERT-v2-FullSong dependency unchanged. Its checkpoint is
+  not distributed here and remains CC BY-NC 4.0, so the MERT runtime path
+  remains limited to non-commercial use without separate permission.
+- Added `LICENSING.md` to separate current NoteForge licensing, historical MIT
+  releases, upstream MERT terms, and closed training materials.
+
 ## 1.1.1
 
 - Added `noteforge mert status`, `noteforge mert fetch`, and
