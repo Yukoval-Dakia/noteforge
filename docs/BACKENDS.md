@@ -103,10 +103,10 @@ run on an NVIDIA host.
 
 x86_64 and ARM64 share the PyTorch inference contract but not the kernel
 implementations. `torch` CPU uses oneDNN on x86_64 and Accelerate on Apple
-ARM64. The x86_64 figures below are pending; the manual workflow
-`.github/workflows/cpu-x86-benchmark.yml` runs the same measurement on a real
+ARM64. `.github/workflows/cpu-x86-benchmark.yml` runs the measurement on a real
 x86_64 GitHub runner, downloads the published r5 weights, checks their SHA-256,
-and uploads `host.txt` and `results.jsonl`.
+and uploads `host.txt` and `results.jsonl`. One such run is in the measured
+section below.
 
 ## Measured results
 
@@ -125,9 +125,9 @@ Host: Apple Silicon (arm64, 8 cores), 16 GiB, macOS 27.3, PyTorch 2.15.0, MLX
 
 ### 8 s fixture, torch CPU, thread sweep
 
-Fixture: 8 s synthetic audio that matches the published feature contract but
-uses synthetic values, so it measures runtime, not chart quality. 5 runs per
-thread count, `batch-size 1`, continuous scheduler.
+Fixture: the first 8 s of a real licensed song with cached real MERT features
+(audio SHA `ac723cf9...`), so the values are real but the clip is short. 5 runs
+per thread count, `batch-size 1`, continuous scheduler.
 
 | threads | runs | generation median s | range s | tokens | notes | output SHA |
 |---|---|---|---|---|---|---|
@@ -208,6 +208,49 @@ for hosts where it helps, but on this Apple ARM CPU path decode is limited by
 per-token latency and memory traffic rather than by parallel matmul throughput.
 This also means the x86_64 result must be measured on x86_64 instead of
 extrapolated from here.
+
+### 8 s fixture, x86_64 CPU (GitHub-hosted runner)
+
+Host: GitHub-hosted `ubuntu-latest`, x86_64, AMD EPYC 9V74 with 4 vCPU
+allocated (2 cores x 2 threads), AVX-512 including `avx512_vnni` and
+`avx512_bf16`, torch 2.15.0+cpu with oneDNN enabled, Python 3.12.16. Synthetic
+8 s fixture, `batch-size 64`, grouped scheduler, 3 runs per setting. The runner
+is shared cloud hardware, so these are that runner's numbers.
+
+| cpu threads | interop threads | runs | generation median s | range s | tokens | notes | output SHA |
+|---|---|---|---|---|---|---|---|
+| 1 | 1 | 3 | 18.5528 | 18.5060..18.6251 | 260 | 37 | `fd6563dd...` |
+| 2 | 1 | 3 | 17.4855 | 17.2300..17.5448 | 260 | 37 | `fd6563dd...` |
+| 4 | 1 | 3 | 20.1282 | 19.8279..20.1659 | 260 | 37 | `fd6563dd...` |
+
+This is the opposite shape from the Apple ARM result: on x86_64 the thread count
+does matter and 2 threads won on this 4-vCPU runner, while 4 threads were worse
+than 1. The lesson is that the CPU thread count is a host-specific tuning knob
+and cannot be copied between architectures. All nine x86_64 runs produced one
+identical event SHA, the same events logic as every other backend.
+
+### Same fixture on both architectures
+
+To compare the two CPU architectures on one input, both hosts ran the same
+generated 8 s fixture (audio SHA
+`dc8dcdd504b9662707e59fa9f2dc568526a1fcb4ecff12609d33dd44c475d28d`),
+`batch-size 64`, grouped scheduler, 2 runs per thread count:
+
+| host | cpu threads | generation median s |
+|---|---|---|
+| Apple ARM64, 8 cores | 1 | 4.756 |
+| Apple ARM64, 8 cores | 2 | 4.875 |
+| Apple ARM64, 8 cores | 4 | 4.826 |
+| Apple ARM64, 8 cores | 8 | 4.860 |
+| x86_64 AMD EPYC 9V74, 4 vCPU | 1 | 18.553 |
+| x86_64 AMD EPYC 9V74, 4 vCPU | 2 | 17.486 |
+| x86_64 AMD EPYC 9V74, 4 vCPU | 4 | 20.128 |
+
+Both produced the same event SHA, `fd6563dd...`, on the same fixture. The Apple
+ARM64 host was about 3.6-4.2x faster here. These are different hardware classes
+— a recent Apple SoC against a shared 4-vCPU cloud slice — so read this as a
+same-input sanity check that the two CPU paths agree on the output, not as a
+like-for-like CPU benchmark.
 
 ## Reporting rules
 
