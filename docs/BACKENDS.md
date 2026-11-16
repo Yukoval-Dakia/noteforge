@@ -207,12 +207,14 @@ this repository. 1 seed, `phira-level 10`, `profile standard`, `batch-size 64`,
 | backend | generation s | wall s | tokens | notes | output SHA |
 |---|---|---|---|---|---|
 | torch CPU, 4 threads | 41.847 | 45.588 | 2029 | 281 | `fd95fcdc...` |
+| torch MPS | 39.365 | — | 2029 | 281 | `fd95fcdc...` |
 | mlx `balanced` | 28.345 | 29.948 | 2029 | 281 | `fd95fcdc...` |
 | mlx `fast` | 18.581 | 20.004 | 2029 | 281 | `fd95fcdc...` |
 
-At `batch-size 64` MLX is 1.5-2.2x faster than torch CPU and all three produced
-byte-identical events. The same MLX path at `batch-size 1` took 91.3 s on this
-song, slower than torch CPU, so batch shape is part of the MLX contract.
+At `batch-size 64` MLX is 1.5-2.2x faster than torch CPU, and torch MPS sits
+between CPU and MLX balanced; all four produced byte-identical events. The same
+MLX path at `batch-size 1` took 91.3 s on this song, slower than torch CPU, so
+batch shape is part of the MLX contract. The MPS figure is a single run.
 
 ### 100.1 s song, torch CPU thread sweep
 

@@ -279,6 +279,16 @@
           "tokens": 2029,
           "notes": 281,
           "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725"
+        },
+        {
+          "name": "torch MPS",
+          "backend": "torch",
+          "device": "mps",
+          "generation_s": 39.365,
+          "model_load_s": 2.364,
+          "tokens": 2029,
+          "notes": 281,
+          "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725"
         }
       ],
       "identical_events": true,
@@ -609,6 +619,7 @@
     "int8 dynamic quantization is unavailable on the Apple ARM PyTorch 2.15.0 build (NoQEngine); x86_64 may differ and must be measured there.",
     "x86_64 (AMD EPYC 9V74, 4 vCPU): 2 CPU threads were fastest on the synthetic 8 s fixture (17.49 s vs 18.55 s at 1 and 20.13 s at 4); thread tuning is host-specific, unlike the flat Apple ARM result.",
     "Same synthetic fixture, same weights: Apple ARM64 ~4.8 s vs x86_64 4-vCPU runner 17.5-20.1 s, byte-identical events. Different hardware classes, same input.",
-    "x86_64 second runner (Intel Xeon 6975P-C, 4 vCPU): 2/4 threads 9.80/9.87 s vs 1 thread 17.10 s; bf16 ~1.7x slower than fp32; reference decode ~1.14x slower than fast. Two GitHub x86 runners gave very different absolute times (AMD EPYC ~17.5 s vs Intel Xeon ~9.8 s at their best), so x86 absolute numbers are runner-specific and must state the runner."
+    "x86_64 second runner (Intel Xeon 6975P-C, 4 vCPU): 2/4 threads 9.80/9.87 s vs 1 thread 17.10 s; bf16 ~1.7x slower than fp32; reference decode ~1.14x slower than fast. Two GitHub x86 runners gave very different absolute times (AMD EPYC ~17.5 s vs Intel Xeon ~9.8 s at their best), so x86 absolute numbers are runner-specific and must state the runner.",
+    "On the 100 s song at batch-size 64, torch MPS took 39.4 s, close to torch CPU 41.8 s and slower than both MLX plans, with the same events."
   ]
 }
