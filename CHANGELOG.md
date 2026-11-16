@@ -15,6 +15,9 @@
   plan-draft-BPM pipeline, and `noteforge export mlx|mlx-mert` performs the
   one-time MLX exports. A re-export of the published r5 weights reproduces the
   existing `models/mlx-fast/weights.safetensors` byte for byte.
+- `noteforge inspect` reads a chart (`.osu`, RPE/official JSON, or a Phira
+  package) and prints note count, model-usable timing segments, and the opening
+  type shares as JSON.
 - `plan_song.py` and `auto_draft.py` now accept an argument list, default
   `--device` to `auto` and the planner folder to the published
   `models/planner_f`, so they work on Apple Silicon without CUDA or a `planner`

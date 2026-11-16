@@ -50,6 +50,7 @@ noteforge extract     # 只提取可复用特征，然后停下（= draft --extr
 noteforge plan        # 只规划分段密度曲线，不出谱
 noteforge draft       # 生成谱面草稿（默认 auto：Apple Silicon 走 MLX，否则 PyTorch）
 noteforge auto        # 计划 + 出谱 + 可选 BPM 对齐，一条命令跑完
+noteforge inspect     # 读一个谱面文件，打印音符数、时间分段和开头类型份额
 noteforge bench       # 在固定输入上测一个后端，输出事件 SHA 便于比对
 noteforge fixture     # 写合成特征夹具，用于不含歌曲/编码器的基准
 noteforge export      # 把 r5 导出为 MLX fp16（或以 bf16 导出 MERT 前端）

@@ -1,5 +1,7 @@
 """`noteforge <command>` is a forwarder: every command keeps its module's own parser."""
+import json
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -120,3 +122,16 @@ def test_export_parser_has_no_hidden_required_flag():
     args = cli.export_parser().parse_args(['mlx'])
     assert args.target == 'mlx'
     assert args.checkpoint.endswith('noteforge-r5.pt')
+
+
+def test_inspect_reads_a_real_chart_and_requires_a_mode(tmp_path, capsys):
+    """`noteforge inspect` exposes the engine's chart reader; mode is mandatory."""
+    chart = tmp_path/'fixture.osu'
+    chart.write_bytes((Path(__file__).parent/'fixture.osu').read_bytes())
+    assert cli.main(['inspect', str(chart), '--mode', 'mania_4k']) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['mode'] == 'mania_4k'
+    assert report['notes'] > 0
+    with pytest.raises(SystemExit) as exc:
+        cli.main(['inspect', str(chart)])
+    assert exc.value.code == 2

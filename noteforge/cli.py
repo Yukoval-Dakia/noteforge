@@ -5,6 +5,7 @@
     noteforge extract    write the reusable features for one song and stop
     noteforge plan       plan a per-section density curve before drafting
     noteforge auto       plan, draft, and (optionally) align to a BPM in one run
+    noteforge inspect    read a chart file: notes, timing segments, opening style
     noteforge bench      measure one backend on a fixed input
     noteforge fixture    write a synthetic feature fixture for benchmarks
     noteforge export     export the published r5 model to the MLX fp16 runtime
@@ -21,7 +22,7 @@ import os
 from pathlib import Path
 import sys
 
-COMMANDS = ('doctor', 'draft', 'extract', 'plan', 'auto', 'bench', 'fixture', 'export', 'serve')
+COMMANDS = ('doctor', 'draft', 'extract', 'plan', 'auto', 'inspect', 'bench', 'fixture', 'export', 'serve')
 
 
 def version():
@@ -72,6 +73,22 @@ def run_auto(argv):
     from noteforge.planner import auto_draft
     auto_draft.main(argv)
     return 0
+
+
+def inspect_parser():
+    parser = argparse.ArgumentParser(
+        prog='noteforge inspect',
+        description='Read a chart file (.osu for mania, RPE or official JSON for Phira) and print notes, '
+                    'timing segments and opening style as JSON.')
+    parser.add_argument('chart', help='the chart file')
+    parser.add_argument('--mode', choices=('mania_4k', 'phira'), required=True)
+    return parser
+
+
+def run_inspect(argv):
+    args = inspect_parser().parse_args(argv)
+    from noteforge_api import ops
+    return ops.main(['inspect-chart', args.chart, args.mode])
 
 
 def run_bench(argv):
@@ -142,7 +159,7 @@ def run_serve(argv):
 
 
 RUNNERS = dict(doctor=run_doctor, draft=run_draft, extract=run_extract, plan=run_plan, auto=run_auto,
-               bench=run_bench, fixture=run_fixture, export=run_export, serve=run_serve)
+               inspect=run_inspect, bench=run_bench, fixture=run_fixture, export=run_export, serve=run_serve)
 
 
 def main(argv=None):
