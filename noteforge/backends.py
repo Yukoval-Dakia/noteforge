@@ -96,11 +96,13 @@ def resolve_backend(requested_backend='auto', requested_device='auto', fast_weig
             error = None
         return BackendTarget(requested_backend, 'mlx', requested_device, 'mlx', error)
     if requested_backend == 'mlx':
-        return BackendTarget(requested_backend, 'mlx', requested_device, 'mlx', 'MLX inference is not available on this host')
+        return BackendTarget(requested_backend, 'mlx', requested_device, None, 'MLX inference is not available on this host')
     try:
         device = resolve_torch_device(requested_device)
     except Exception as exc:  # noqa: BLE001 - reported through health/capabilities
-        return BackendTarget(requested_backend, 'torch', requested_device, requested_device, str(exc))
+        # ``device`` stays None: nothing resolved, so reporting the requested name
+        # as if it were live would misstate the host.
+        return BackendTarget(requested_backend, 'torch', requested_device, None, str(exc))
     return BackendTarget(requested_backend, 'torch', requested_device, device)
 
 

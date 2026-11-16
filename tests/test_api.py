@@ -70,6 +70,21 @@ def test_mlx_is_reported_as_an_explicit_backend(tmp_path):
     assert 'backend_error' in health
 
 
+def test_unresolved_device_is_not_reported_as_a_live_device(tmp_path):
+    """A request for an absent device fails closed: no device, an error, and not ready."""
+    import torch
+    if torch.cuda.is_available():
+        return
+    app = create_app(data=tmp_path, token='secret', engine_python=ENGINE_PY, fake=False,
+                     backend='torch', device='cuda')
+    with TestClient(app) as c:
+        health = c.get('/v1/health').json()
+    assert health['requested_device'] == 'cuda'
+    assert health['device'] is None
+    assert health['ready'] is False
+    assert 'CUDA was requested' in health['backend_error']
+
+
 def test_audio_rules(client):
     r = client.post('/v1/audio', headers=H, files=dict(file=('song.exe', b'x')))
     assert r.status_code == 415 and r.json()['error']['code'] == 'unsupported_audio'
