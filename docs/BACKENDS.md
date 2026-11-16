@@ -54,12 +54,26 @@ The setting is honored and reported; it is not a speed knob on that path.
 
 ## MLX on Apple Silicon
 
+The pinned MERT-v2 source is shared by every backend. `models/mlx-mert` is an
+optional bf16-derived cache for the Apple MLX workflow, not a separate upstream
+model and not a requirement for torch CPU, CUDA, or MPS:
+
+```bash
+noteforge mert status --source hf
+noteforge mert fetch --source hf --out models/mert2-source
+noteforge mert export-mlx --source models/mert2-source --out models/mlx-mert
+```
+
+Only `mert fetch --source hf` downloads the approximately 2.4 GB checkpoint.
+`doctor --fix` uses a source already on disk and requires `--download` before it
+will fetch `hf`.
+
 MLX does not load the `.pt` file directly. Export both folders once, then point
 the environment at them:
 
 ```bash
 python -m noteforge.mlx.fast_model export models/noteforge-r5.pt ./models/mlx-fast
-python -m noteforge.mlx.mert_fast export /path/to/pinned-mert2 ./models/mlx-mert
+noteforge mert export-mlx --source /path/to/pinned-mert2 --out ./models/mlx-mert
 ```
 
 The MLX decode plan (`balanced`, `fast`, `sequential`) changes only scheduling;

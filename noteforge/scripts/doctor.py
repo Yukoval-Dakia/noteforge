@@ -2,7 +2,7 @@
 
     python -m noteforge.scripts.doctor            # human-readable report
     python -m noteforge.scripts.doctor --json     # the same report as JSON
-    python -m noteforge.scripts.doctor --fix      # build the MLX exports it can build
+    python -m noteforge.scripts.doctor --fix      # build MLX exports from sources already on disk
 
 The report reuses the same resolvers the runtime uses (``noteforge.backends``,
 ``resolve_mert_source``, the manifest) instead of a second opinion, so a green
@@ -146,7 +146,8 @@ def check_mert_source(report, source_arg):
             return
     report.add('mert_source', 'fail',
                f'no pinned MERT-v2 source under {", ".join(map(str, candidates))}; the encoder can download it with '
-               '--mert-source hf', hint='--mert-source hf')
+               '`noteforge mert fetch --source hf --out models/mert2-source`',
+               hint='noteforge mert fetch --source hf --out models/mert2-source')
 
 
 def check_backend(report, backend, device, fast_weights, fast_mert):
@@ -193,6 +194,12 @@ def run_fix(report, args):
         fast_model.export(checkpoint, ROOT/backends.MLX_FAST_DIR)
         report.add('fix', 'ok', f'wrote {backends.MLX_FAST_DIR}')
     if mert is None:
+        if args.mert_source == 'hf' and not args.download:
+            report.add('fix', 'warn',
+                       'MERT is not downloaded by doctor --fix. Run '
+                       '`noteforge mert fetch --source hf --out models/mert2-source` first, '
+                       'or pass --download explicitly.')
+            return
         try:
             mert_fast.export(args.mert_source, ROOT/backends.MLX_MERT_DIR)
         except SystemExit as exc:
@@ -231,6 +238,8 @@ def build_parser():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--json', action='store_true', help='print the report as JSON')
     parser.add_argument('--fix', action='store_true', help='build anything that can be built here (the MLX exports)')
+    parser.add_argument('--download', action='store_true',
+                        help='allow doctor --fix to download the pinned 2.4 GB MERT checkpoint when --mert-source is hf')
     parser.add_argument('--no-hash', action='store_true', help='skip the SHA-256 check of the committed weights')
     parser.add_argument('--backend', choices=backends.BACKENDS, default=os.environ.get('NOTEFORGE_BACKEND', 'auto'))
     parser.add_argument('--device', choices=backends.DEVICES, default=os.environ.get('NOTEFORGE_DEVICE', 'auto'))

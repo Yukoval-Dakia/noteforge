@@ -10,7 +10,7 @@ NoteForge 给一首歌生成可编辑的节奏谱草稿：Phira / Phigros 风格
 |---|---|---|
 | 推理引擎 | `noteforge/` | MERT-v2 + 10 ms mel 特征、整曲滚动生成、共识聚合、谱面解析与导出 |
 | HTTP 接口 | `noteforge_api/` | 上传音频或已有谱、异步生成、分段选择、修订、导出；OpenAPI 见 `openapi.json` |
-| Apple MLX 路径 | `noteforge/mlx/` | Apple Silicon 上的独立 fp16 图执行实现 |
+| Apple MLX 路径 | `noteforge/mlx/` | Apple Silicon 上的独立 fp16 图执行实现；MERT 仍使用共享来源 |
 | 辅助权重 | `models/planner_f/`、`noteforge/placement/` | 密度曲线规划器和 Phira 位置摆放模型 |
 | 推理合同 | `models/config/` | 冻结的 mel 归一化系数和 r5 推理参数 |
 | 权重清单 | `models/MANIFEST.json` | 每个权重文件的字节数和 SHA-256 |
@@ -30,7 +30,14 @@ shasum -a 256 models/noteforge-r5.pt
 
 小权重和推理系数已随仓分发；`models/MANIFEST.json` 给出全部 SHA。`noteforge.finalmodelv1` 文件只含 config、vocabulary、EMA 权重和推理合同，不含 optimizer、训练计划或语料信息。公开 mel 系数只含 128 维 mean/std 及其 SHA。
 
-MERT-v2 编码器权重不在本仓库。代码固定 `m-a-p/MERT-v2-FullSong` revision `7001f7657276238629e61c7746ce70735e0604c0`，可用 `--mert-source hf` 下载，或提供包含固定 SHA 文件的本地快照。首次真实特征提取需要该编码器、`torchaudio` 和 `ffmpeg`/`ffprobe`。
+MERT-v2 编码器权重不在本仓库。代码固定 `m-a-p/MERT-v2-FullSong` revision `7001f7657276238629e61c7746ce70735e0604c0`。同一份 MERT 来源供 torch CPU、CUDA、MPS 和 MLX 共用；可用 `--mert-source hf` 按需读取，或先显式保存到本地：
+
+```bash
+noteforge mert status --source hf
+noteforge mert fetch --source hf --out models/mert2-source
+```
+
+`mert fetch --source hf` 会下载约 2.4 GB 权重，因此只在你主动执行时发生。`models/mlx-mert` 不是另一份上游模型，也不是其他后端的限制条件；它是 Apple MLX 路径可选使用的 bf16 派生缓存。首次真实特征提取需要 MERT、`torchaudio` 和 `ffmpeg`/`ffprobe`。
 
 ## 安装与命令行
 
@@ -53,7 +60,8 @@ noteforge auto        # 计划 + 出谱 + 可选 BPM 对齐，一条命令跑完
 noteforge inspect     # 读一个谱面文件，打印音符数、时间分段和开头类型份额
 noteforge bench       # 在固定输入上测一个后端，输出事件 SHA 便于比对
 noteforge fixture     # 写合成特征夹具，用于不含歌曲/编码器的基准
-noteforge export      # 把 r5 导出为 MLX fp16（或以 bf16 导出 MERT 前端）
+noteforge mert        # 检查/获取共享 MERT 来源，或生成可选的 MLX bf16 缓存
+noteforge export      # 把 r5 导出为 MLX fp16（`mlx-mert` 为兼容别名）
 noteforge serve       # 启动 HTTP API（= uvicorn noteforge_api.asgi:app）
 noteforge version     # 打印版本
 ```
@@ -89,10 +97,10 @@ noteforge auto --audio song.mp3 --mode phira --level 6 --bpm 174 \
 ```bash
 python -m noteforge.scripts.doctor          # 人类可读报告
 python -m noteforge.scripts.doctor --json   # 同样内容，JSON（可用于 CI）
-python -m noteforge.scripts.doctor --fix    # 还会构建 MLX 导出（Apple Silicon）
+python -m noteforge.scripts.doctor --fix    # 使用已在磁盘上的来源构建 MLX 导出（Apple Silicon）
 ```
 
-退出码 0 表示这台机器可以直接出谱，1 表示还缺必需项；`warn`/`info` 不影响退出码。`--fix` 只做能做的事：在 Apple Silicon 上按约定目录构建 `models/mlx-fast` 与 `models/mlx-mert`，然后重新解析后端。
+退出码 0 表示这台机器可以直接出谱，1 表示还缺必需项；`warn`/`info` 不影响退出码。`--fix` 只使用已经在磁盘上的来源，在 Apple Silicon 上构建 `models/mlx-fast` 与可选的 `models/mlx-mert`，然后重新解析后端。它不会在后台下载 MERT；需要下载时必须显式运行 `noteforge mert fetch`，或给 `doctor --fix` 同时传入 `--download`。
 
 ## 推理后端
 
@@ -117,8 +125,8 @@ python -m noteforge.scripts.doctor --fix
 # 主模型 fp16 MLX 导出
 python -m noteforge.mlx.fast_model export models/noteforge-r5.pt ./models/mlx-fast
 
-# 固定 MERT-v2 的 bf16 快速前端
-python -m noteforge.mlx.mert_fast export /path/to/pinned-mert2 ./models/mlx-mert
+# 可选：从所有后端共用的 MERT 来源生成 MLX bf16 缓存
+noteforge mert export-mlx --source /path/to/pinned-mert2 --out ./models/mlx-mert
 
 export NOTEFORGE_BACKEND=mlx
 export NOTEFORGE_FAST_WEIGHTS=$PWD/models/mlx-fast
@@ -126,7 +134,7 @@ export NOTEFORGE_FAST_MERT=$PWD/models/mlx-mert
 NOTEFORGE_API_TOKEN=secret uvicorn noteforge_api.asgi:app --port 8787
 ```
 
-MLX 生成分支的默认计划是 `balanced`。API 请求里的 `plan` 可取 `balanced`、`fast` 或 `sequential`；这些是解码调度差异，不改变 r5 权重或共识规则。
+MLX 生成分支的默认计划是 `balanced`。API 请求里的 `plan` 可取 `balanced`、`fast` 或 `sequential`；这些是解码调度差异，不改变 r5 权重或共识规则。`models/mlx-mert` 只服务 MLX 路径的加载速度；torch CPU/CUDA/MPS 直接读取同一份 MERT 来源，不需要它。
 
 ### x86_64 / ARM64 CPU
 

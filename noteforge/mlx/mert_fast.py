@@ -1,8 +1,12 @@
-"""MERT at bf16 from a one-time export: no fp32 load and no 2.5 GB hash on every run.
+"""Optional MERT bf16 export for the Apple MLX path.
 
     mert_fast.py export SOURCE_DIR OUT_DIR     checks the pinned source once, writes bf16 weights + config + code
     mert_fast.py extract FAST_DIR ...          draft_song arguments
-The audio frontend stays fp32, as the pinned model requires. Measured: features bit-identical to the pinned MPS path."""
+The shared MERT source is available to every backend through ``--mert-source``.
+This export only removes repeat fp32 loading and full checkpoint hashing on the
+MLX workflow. The audio frontend stays fp32, as the pinned model requires.
+Measured: features bit-identical to the pinned MPS path.
+"""
 import shutil
 import sys
 import time
@@ -15,22 +19,9 @@ from noteforge.scripts import draft_song as ds
 
 
 def source_dir(source_arg):
-    """The pinned MERT-v2 snapshot as a local directory.
-
-    ``--mert-source hf`` means "use the pinned Hugging Face revision"; for the
-    export we need its files on disk, so download that exact revision first.
-    The four exported files are checked against their pinned SHA-256 either way.
-    """
-    from noteforge.audio.mert2 import LOCAL_SOURCE_SHA256, REPO, REVISION, validate_local_source
-    directory = ds.resolve_mert_source(source_arg)[0]
-    if directory is None:
-        try:
-            from huggingface_hub import snapshot_download
-        except ImportError as exc:
-            raise SystemExit('--mert-source hf needs huggingface_hub; pip install huggingface_hub') from exc
-        directory = snapshot_download(REPO, revision=REVISION, allow_patterns=sorted(LOCAL_SOURCE_SHA256))
-    validate_local_source(directory)
-    return Path(directory)
+    """Compatibility shim for the backend-neutral MERT source resolver."""
+    from noteforge.audio.mert_source import source_dir as resolve_source
+    return resolve_source(source_arg)
 
 
 def export(source_arg, out):

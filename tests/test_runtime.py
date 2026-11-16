@@ -306,3 +306,48 @@ def test_mlx_mert_export_rejects_a_source_whose_pinned_files_changed(tmp_path, m
     monkeypatch.setitem(sys.modules, 'huggingface_hub', fake_hub)
     with pytest.raises(ValueError, match='identity changed'):
         mert_fast.source_dir('hf')
+
+
+def test_doctor_fix_does_not_implicitly_download_mert(tmp_path, monkeypatch):
+    from noteforge.scripts import doctor
+    report = doctor.Report()
+    args = doctor.build_parser().parse_args(['--fix', '--mert-source', 'hf'])
+    monkeypatch.setattr(doctor.backends, 'discover_mlx_assets', lambda root: (tmp_path/'weights.pt', None))
+    monkeypatch.setattr(doctor.backends, 'mlx_available', lambda: True)
+    weights = tmp_path/'noteforge-r5.pt'
+    weights.write_bytes(b'r5')
+    args.model = weights
+    doctor.run_fix(report, args)
+    assert any('not downloaded by doctor --fix' in check['message'] for check in report.checks)
+
+
+def test_mert_fetch_hf_downloads_only_when_called_and_validates_target(tmp_path, monkeypatch):
+    import hashlib
+    import sys
+    import types
+    from noteforge.audio import mert_source
+
+    output = tmp_path/'mert'
+    names = ('config.json', 'model.safetensors', 'configuration_mert2.py', 'modeling_mert2.py')
+    calls = {}
+    fake_hub = types.ModuleType('huggingface_hub')
+
+    def snapshot_download(repo, revision=None, allow_patterns=None, local_dir=None):
+        calls.update(repo=repo, revision=revision, allow=sorted(allow_patterns), local_dir=local_dir)
+        target = tmp_path/'mert'
+        target.mkdir(exist_ok=True)
+        for name in names:
+            (target/name).write_text(name)
+        return str(target)
+
+    fake_hub.snapshot_download = snapshot_download
+    monkeypatch.setitem(sys.modules, 'huggingface_hub', fake_hub)
+    monkeypatch.setattr('noteforge.audio.mert2.LOCAL_SOURCE_SHA256',
+                        {name: hashlib.sha256(name.encode()).hexdigest() for name in names})
+    assert mert_source.fetch('hf', output) == output.resolve()
+    assert calls == dict(
+        repo='m-a-p/MERT-v2-FullSong',
+        revision='7001f7657276238629e61c7746ce70735e0604c0',
+        allow=sorted(names),
+        local_dir=str(output),
+    )

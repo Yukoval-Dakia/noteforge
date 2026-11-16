@@ -8,6 +8,7 @@
     noteforge inspect    read a chart file: notes, timing segments, opening style
     noteforge bench      measure one backend on a fixed input
     noteforge fixture    write a synthetic feature fixture for benchmarks
+    noteforge mert       fetch or check the shared MERT source; export its MLX cache
     noteforge export     export the published r5 model to the MLX fp16 runtime
     noteforge serve      start the HTTP API
     noteforge version    print the version
@@ -22,7 +23,7 @@ import os
 from pathlib import Path
 import sys
 
-COMMANDS = ('doctor', 'draft', 'extract', 'plan', 'auto', 'inspect', 'bench', 'fixture', 'export', 'serve')
+COMMANDS = ('doctor', 'draft', 'extract', 'plan', 'auto', 'inspect', 'bench', 'fixture', 'mert', 'export', 'serve')
 
 
 def version():
@@ -103,14 +104,78 @@ def run_fixture(argv):
     return 0
 
 
+def mert_parser():
+    parser = argparse.ArgumentParser(
+        prog='noteforge mert',
+        description='Manage the shared pinned MERT-v2 source used by torch CPU/CUDA/MPS and MLX. '
+                    '`fetch --source hf` downloads about 2.4 GB; `export-mlx` is an optional '
+                    'Apple-only bf16 cache derived from that source.')
+    parser.add_argument('action', choices=('status', 'fetch', 'export-mlx'))
+    parser.add_argument('--source', default=os.environ.get('NOTEFORGE_MERT_SOURCE'),
+                        help="a pinned local directory or 'hf' (default: NOTEFORGE_MERT_SOURCE)")
+    parser.add_argument('--out', help='source directory for fetch, or the derived MLX cache for export-mlx')
+    parser.add_argument('--json', action='store_true', help='print status as JSON')
+    return parser
+
+
+def run_mert(argv):
+    args = mert_parser().parse_args(argv)
+    from noteforge.audio import mert_source
+    if args.action == 'status':
+        if not args.source:
+            print('noteforge mert status needs --source DIR (or NOTEFORGE_MERT_SOURCE)', file=sys.stderr)
+            return 2
+        source, identity = mert_source.resolve(args.source)
+        report = dict(
+            action='status',
+            source=str(source) if source is not None else 'hf',
+            downloaded=source is not None,
+            identity=identity,
+            note='The same MERT source is shared by torch CPU/CUDA/MPS and MLX. '
+                 'The mlx-mert path is only an optional derived bf16 export.',
+        )
+        if args.json:
+            import json
+            print(json.dumps(report, indent=2))
+        else:
+            print(f"MERT source: {report['source']}")
+            print('Shared by: torch CPU, torch CUDA, torch MPS, MLX')
+            print('MLX bf16 cache: optional derived export, not a download restriction')
+        return 0
+    if args.action == 'export-mlx':
+        if not args.source:
+            print('noteforge mert export-mlx needs --source DIR|hf (or NOTEFORGE_MERT_SOURCE)', file=sys.stderr)
+            return 2
+        from noteforge.backends import MLX_MERT_DIR
+        from noteforge.mlx import mert_fast
+        root = Path(__file__).resolve().parents[1]
+        out = Path(args.out) if args.out else root/MLX_MERT_DIR
+        mert_fast.export(args.source, out)
+        return 0
+    if not args.source:
+        print('noteforge mert fetch needs --source DIR|hf (or NOTEFORGE_MERT_SOURCE)', file=sys.stderr)
+        return 2
+    if args.source == 'hf' and not args.out:
+        print('noteforge mert fetch --source hf needs --out DIR so the 2.4 GB download has an explicit target',
+              file=sys.stderr)
+        return 2
+    if not args.out:
+        print('noteforge mert fetch needs --out DIR', file=sys.stderr)
+        return 2
+    print(mert_source.fetch(args.source, args.out))
+    return 0
+
+
 def export_parser():
     parser = argparse.ArgumentParser(
-        prog='noteforge export', description='Export the model to the MLX fp16 runtime, or the MERT front end to bf16.')
+        prog='noteforge export',
+        description='Export the model to the MLX fp16 runtime. `mlx-mert` is a compatibility alias '
+                    'for the optional bf16 MERT cache; it is not the shared MERT download path.')
     parser.add_argument('target', choices=('mlx', 'mlx-mert'), help='what to export')
     parser.add_argument('--checkpoint', default=os.environ.get('NOTEFORGE_MODEL', 'models/noteforge-r5.pt'),
                         help='r5 checkpoint for `mlx`')
     parser.add_argument('--mert-source', default=os.environ.get('NOTEFORGE_MERT_SOURCE'),
-                        help='pinned MERT-v2 directory for `mlx-mert`')
+                        help="shared pinned MERT-v2 directory or 'hf' for the optional `mlx-mert` export")
     parser.add_argument('--out', help='output folder (default: the conventional models/ folder)')
     return parser
 
@@ -159,7 +224,8 @@ def run_serve(argv):
 
 
 RUNNERS = dict(doctor=run_doctor, draft=run_draft, extract=run_extract, plan=run_plan, auto=run_auto,
-               inspect=run_inspect, bench=run_bench, fixture=run_fixture, export=run_export, serve=run_serve)
+               inspect=run_inspect, bench=run_bench, fixture=run_fixture, mert=run_mert,
+               export=run_export, serve=run_serve)
 
 
 def main(argv=None):

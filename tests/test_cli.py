@@ -124,6 +124,33 @@ def test_export_parser_has_no_hidden_required_flag():
     assert args.checkpoint.endswith('noteforge-r5.pt')
 
 
+def test_mert_status_is_backend_neutral_and_does_not_download(capsys, monkeypatch):
+    def fail_download(*args, **kwargs):
+        raise AssertionError('status must not download MERT')
+
+    monkeypatch.delenv('NOTEFORGE_MERT_SOURCE', raising=False)
+    monkeypatch.setattr('huggingface_hub.snapshot_download', fail_download, raising=False)
+    assert cli.main(['mert', 'status', '--source', 'hf', '--json']) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report['source'] == 'hf'
+    assert report['downloaded'] is False
+    assert report['identity']['shared_by'] == ['torch-cpu', 'torch-cuda', 'torch-mps', 'mlx']
+
+
+def test_mert_fetch_requires_an_explicit_hf_output(capsys):
+    assert cli.main(['mert', 'fetch', '--source', 'hf']) == 2
+    assert '2.4 GB' in capsys.readouterr().err
+
+
+def test_mert_export_mlx_is_an_explicit_derived_cache(monkeypatch, tmp_path):
+    seen = {}
+    from noteforge.mlx import mert_fast
+
+    monkeypatch.setattr(mert_fast, 'export', lambda source, out: seen.update(source=source, out=out))
+    assert cli.main(['mert', 'export-mlx', '--source', 'hf', '--out', str(tmp_path)]) == 0
+    assert seen == dict(source='hf', out=tmp_path)
+
+
 def test_inspect_reads_a_real_chart_and_requires_a_mode(tmp_path, capsys):
     """`noteforge inspect` exposes the engine's chart reader; mode is mandatory."""
     chart = tmp_path/'fixture.osu'

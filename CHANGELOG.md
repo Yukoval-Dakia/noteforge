@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.1
+
+- Added `noteforge mert status`, `noteforge mert fetch`, and
+  `noteforge mert export-mlx`. The pinned MERT source is shared by torch
+  CPU/CUDA/MPS and MLX; `mlx-mert` is only an optional derived bf16 cache for
+  the Apple MLX path. `noteforge export mlx-mert` remains as a compatibility
+  alias.
+- `doctor --fix` no longer downloads the pinned 2.4 GB MERT checkpoint just
+  because `--mert-source hf` is present. Downloads require an explicit
+  `noteforge mert fetch --source hf --out DIR` command or `doctor --fix
+  --download`.
+- Moved backend-neutral MERT source resolution out of `noteforge.mlx` so the
+  CLI and product docs no longer imply that only MLX may obtain or use MERT.
+
 ## 1.1.0
 
 - Added the unified `noteforge` console script with subcommands `doctor`,
