@@ -19,11 +19,11 @@ NoteForge 给一首歌生成可编辑的节奏谱草稿：Phira / Phigros 风格
 
 ## 权重下载
 
-`models/noteforge-r5.pt` 约 1.2 GB，作为 [v1.2.0 Release 资产](https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.2.0/noteforge-r5.pt) 发布。同一份权重的 v1.0.0 资产继续保留其原始 MIT 授权：
+`models/noteforge-r5.pt` 约 1.2 GB，继续使用 [v1.0.0 Release 资产](https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt) 下载。NoteForge 1.2.0 对同一 SHA-256 的权重字节额外授予 Apache-2.0；早期下载副本保留其原始 MIT 授权：
 
 ```bash
 curl -L -o models/noteforge-r5.pt \
-  https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.2.0/noteforge-r5.pt
+  https://github.com/Yukoval-Dakia/noteforge/releases/download/v1.0.0/noteforge-r5.pt
 shasum -a 256 models/noteforge-r5.pt
 # 1b1f2e8dee82101690778ef667b661fa1d88421f50034c0bd97572f3067d405b
 ```

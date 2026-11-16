@@ -18,9 +18,11 @@ NoteForge releases through v1.1.1 were published under the MIT License. That
 grant is permanent for those released copies and cannot be revoked by the later
 change. The Apache-2.0 license applies to releases from v1.2.0 onward.
 
-The r5 weights in the v1.0.0 Release were published under MIT. Re-distributing
-the same r5 weights in a v1.2.0 or later NoteForge release adds Apache-2.0
-permission for that distribution; it does not withdraw the earlier MIT grant.
+The r5 weights in the v1.0.0 Release were published under MIT. NoteForge 1.2.0
+and later releases offer Apache-2.0 permission for the same published weight
+bytes, identified by SHA-256. The download may remain hosted on the original
+v1.0.0 Release URL; the later Apache-2.0 grant does not withdraw the earlier
+MIT grant.
 
 ## Upstream MERT weights
 

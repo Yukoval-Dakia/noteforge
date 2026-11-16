@@ -6,9 +6,9 @@
   covers the source code, CLI, HTTP API, documentation, planner and placement
   weights, and NoteForge's distributed model weights. Apache-2.0 adds an
   explicit patent grant and patent-retaliation terms.
-- Re-published the unchanged r5 weights as a v1.2.0 Release asset under
-  Apache-2.0. The earlier v1.0.0 copy remains available under its original MIT
-  grant.
+- Applied Apache-2.0 from v1.2.0 to the unchanged r5 weight bytes by their
+  published SHA-256. The download remains hosted as the v1.0.0 Release asset,
+  whose original MIT grant also remains valid.
 - Kept releases through v1.1.1 under their original MIT grant. A later license
   change cannot revoke rights already granted for those released copies.
 - Kept the upstream MERT-v2-FullSong dependency unchanged. Its checkpoint is
