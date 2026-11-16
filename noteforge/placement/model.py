@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-torch.set_num_threads(3)
 BINS = np.linspace(-675, 675, 28)
 NB = len(BINS) - 1
 

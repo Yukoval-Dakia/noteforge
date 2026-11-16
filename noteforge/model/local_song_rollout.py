@@ -61,7 +61,7 @@ def _initial_states(songs, history_reference):
                  history_reference=history_reference) for song in songs]
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def generate_complete_songs(model, features, songs, *, device, batch_size=4, token_cap=4096,
                             max_wall_s=1200, history_reference=False, on_progress=None,
                             generator=generate_batch, input_shapes=None, intensity_provider=None,
@@ -124,7 +124,7 @@ def generate_complete_songs(model, features, songs, *, device, batch_size=4, tok
                 conditioning='unspecified per-core conditions, no hidden human attributes')
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def generate_complete_song_samples(model, features, songs, seeds, *, device, batch_size=64, token_cap=4096,
                                    max_wall_s=1200, history_reference=False, on_progress=None,
                                    generator=generate_batch, input_shapes=None, intensity_provider=None,
@@ -234,7 +234,10 @@ def _build_core_row(state, request, features, *, history_reference, intensity_pr
 
 
 def _device_rows(rows, input_shapes, device):
-    inputs, _ = collate(rows)
+    # Rollout callers retain the collator adapter as {"inputs", "sequence"}; generation
+    # consumes only the inference inputs. Direct callers may still pass flat rows.
+    rows = [row['inputs'] if isinstance(row, dict) and set(row) == {'inputs', 'sequence'} else row for row in rows]
+    inputs = collate(rows)
     if input_shapes:
         inputs = pad_input_shapes(inputs, input_shapes)
     return {k: v.to(device) for k, v in inputs.items()}

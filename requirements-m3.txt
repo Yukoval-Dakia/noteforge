@@ -1,3 +1,0 @@
-# Optional Apple Silicon fp16 inference path.
--r requirements.txt
-mlx>=0.22

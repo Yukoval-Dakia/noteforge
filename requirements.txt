@@ -1,5 +1,6 @@
 # Core inference engine.
 torch>=2.5
+torchaudio>=2.5
 numpy>=1.26
 # Pinned MERT-v2 frontend (see noteforge/audio/mert2.py).
 transformers==4.53.2

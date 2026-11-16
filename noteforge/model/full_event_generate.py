@@ -284,7 +284,7 @@ def _sample_rows(scores, legal, active, temperature, top_p, generators):
     return torch.cat(picks, 0)
 
 
-@torch.no_grad()
+@torch.inference_mode()
 def generate_batch(model, inputs, requests, max_tokens, *, deadline=None,
                    temperature=None, top_p=None, generator=None,
                    guidance=None, unconditional_inputs=None, field_temperature=None,

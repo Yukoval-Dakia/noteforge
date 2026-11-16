@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from noteforge.backends import availability, resolve_backend
 from .schemas import ContinueRequest, DraftRequest, Mode, RevisionRequest
 
 API_VERSION = '1.0'
@@ -59,17 +60,18 @@ class Settings:
         self.planner_dir = str(over.get('planner_dir') or env('NOTEFORGE_PLANNER_DIR', ROOT/'models/planner_f'))
         self.mert_source = over.get('mert_source', env('NOTEFORGE_MERT_SOURCE'))
         self.mert_python = over.get('mert_python', env('NOTEFORGE_MERT_PYTHON'))  # the feature step can need its own environment
-        self.device = over.get('device') or env('NOTEFORGE_DEVICE', 'cuda')
+        self.device = over.get('device') or env('NOTEFORGE_DEVICE', 'auto')
         self.batch_size = int(over.get('batch_size') or env('NOTEFORGE_BATCH_SIZE', 64))
         self.max_wall_s = float(over.get('max_wall_s') or env('NOTEFORGE_MAX_WALL_S', 1800))
         self.max_upload = int(over.get('max_upload') or env('NOTEFORGE_MAX_UPLOAD_MB', 100))*CHUNK
         self.cors = [x for x in str(over.get('cors') or env('NOTEFORGE_CORS_ORIGINS', '')).split(',') if x]
         self.fake = over.get('fake', env('NOTEFORGE_FAKE_ENGINE') == '1')
-        self.backend = over.get('backend') or env('NOTEFORGE_BACKEND', 'cuda')  # cuda or m3
+        self.backend = over.get('backend') or env('NOTEFORGE_BACKEND', 'auto')
         self.fast_weights = over.get('fast_weights') or env('NOTEFORGE_FAST_WEIGHTS', '')
         self.fast_mert = over.get('fast_mert') or env('NOTEFORGE_FAST_MERT', '')
         self.mel_stats = str(over.get('mel_stats') or env('NOTEFORGE_MEL_STATS', ROOT/'models/config/mel-statistics.json'))
         self.warm_idle_s = float(over.get('warm_idle_s') or env('NOTEFORGE_WARM_IDLE_S', 300))  # unload the waiting model after this
+        self.target = resolve_backend(self.backend, self.device, self.fast_weights, self.fast_mert)
         if not self.token:
             raise RuntimeError('NOTEFORGE_API_TOKEN is required')
 
@@ -146,7 +148,7 @@ def start_engine(settings):
     path = engine_socket(settings)
     if not _alive(Path(path+'.pid')):  # a socket file alone proves nothing: a killed engine leaves one behind
         with open(settings.data/'engine-server.log', 'a') as log:
-            process = subprocess.Popen([settings.engine_python, str(ROOT/'noteforge/m3/engine_server.py'), path, settings.fast_weights, str(settings.warm_idle_s)],
+            process = subprocess.Popen([settings.engine_python, str(ROOT/'noteforge/mlx/engine_server.py'), path, settings.fast_weights, str(settings.warm_idle_s)],
                                        stdout=log, stderr=log, env=op_env(settings), cwd=settings.engine_root, start_new_session=True)
         Path(path+'.pid').write_text(str(process.pid))
 
@@ -195,7 +197,7 @@ def warm_call(settings, args, timeout):
 
 
 def run_op(settings, *args, timeout=180):
-    if settings.backend == 'm3' and not settings.fake and args[0] in ('continue', 'assemble', 'export'):
+    if settings.target.backend == 'mlx' and not settings.fake and args[0] in ('continue', 'assemble', 'export'):
         done = warm_call(settings, args, timeout)
         if done is not None:
             return done
@@ -285,7 +287,7 @@ class Worker(threading.Thread):
         (folder/'progress.json').unlink(missing_ok=True)
         limit = s.max_wall_s+1200  # features and the first pass come on top of the generation limit
         done = None
-        if s.backend == 'm3' and not s.fake:
+        if s.target.backend == 'mlx' and not s.fake:
             # Features run beside the engine as it loads; everything after them runs inside it.
             start_engine(s)
             done = self.child(draft_id, ['features', str(folder)], limit)
@@ -380,15 +382,25 @@ def create_app(**over):
     def missing_engine():
         if settings.fake:
             return []
-        need = ('fast_weights', 'fast_mert', 'mel_stats', 'plan', 'planner_dir') if settings.backend == 'm3' else ('model', 'plan', 'planner_dir')
-        return [k for k in need if not getattr(settings, k) or not Path(getattr(settings, k)).exists()]
+        if not settings.target.ready:
+            return ['backend']
+        need = ('fast_weights', 'fast_mert', 'mel_stats', 'plan', 'planner_dir') if settings.target.backend == 'mlx' else ('model', 'plan', 'planner_dir')
+        missing = [k for k in need if not getattr(settings, k) or not Path(getattr(settings, k)).exists()]
+        return missing
+
+    def engine_state():
+        state = dict(requested_backend=settings.backend, backend=settings.target.backend,
+                     requested_device=settings.device, device=settings.target.device)
+        if settings.target.error:
+            state['backend_error'] = settings.target.error
+        return state
 
     @app.get('/v1/health', tags=['service'])
     def health():
         """No token needed. `ready` means a draft can be generated."""
         missing = missing_engine()
         return dict(status='ok', api_version=API_VERSION, ready=not missing, missing=missing, running=worker.current,
-                    queued=len(worker.waiting), engine='fake' if settings.fake else 'r5-l322m', backend=settings.backend)
+                    queued=len(worker.waiting), engine='fake' if settings.fake else 'r5-l322m', **engine_state())
 
     @app.get('/v1/capabilities', dependencies=[Depends(auth)], tags=['service'])
     def capabilities():
@@ -397,8 +409,11 @@ def create_app(**over):
                     profiles=['relaxed', 'standard', 'expert', 'none'], default_profile='standard',
                     chart_formats=dict(phira=['phira_zip', 'rpe_json'], mania_4k=['osz', 'osu']), default_phira_speed=10.,
                     audio_types=sorted(AUDIO_TYPES), max_upload_mb=settings.max_upload//CHUNK,
-                    level_required=dict(phira=True, mania_4k=False), section_lengths_s=[8, 16, 32], backend=settings.backend,
-                    plans=['balanced', 'fast', 'sequential'] if settings.backend == 'm3' else [], recommended_samples=1 if settings.backend == 'm3' else 8, continue_supported=settings.backend == 'm3' or settings.fake)
+                    level_required=dict(phira=True, mania_4k=False), section_lengths_s=[8, 16, 32], **engine_state(),
+                    available=availability(settings.fast_weights, settings.fast_mert),
+                    plans=['balanced', 'fast', 'sequential'] if settings.target.backend == 'mlx' else [],
+                    recommended_samples=1 if settings.target.backend == 'mlx' else 8,
+                    continue_supported=settings.target.backend == 'mlx' or settings.fake)
 
     async def save_upload(file: UploadFile, folder: Path):
         handle, name = tempfile.mkstemp(dir=folder, prefix='.upload-')
@@ -465,8 +480,11 @@ def create_app(**over):
         audio = store.audio_path(request.audio_id)
         mode = request.mode.value
         resolved = dict(audio_path=str(audio), features_dir=str(store.features), model=settings.model, plan=settings.plan, planner_dir=settings.planner_dir,
-                        backend=settings.backend, fast_weights=settings.fast_weights, fast_mert=settings.fast_mert, mel_stats=settings.mel_stats,
-                        mert_source=settings.mert_source, mert_python=settings.mert_python, device=settings.device, batch_size=settings.batch_size, max_wall_s=settings.max_wall_s)
+                        backend=settings.target.backend, requested_backend=settings.backend,
+                        fast_weights=settings.fast_weights, fast_mert=settings.fast_mert, mel_stats=settings.mel_stats,
+                        mert_source=settings.mert_source, mert_python=settings.mert_python, device=settings.target.device,
+                        requested_device=settings.device, backend_error=settings.target.error,
+                        batch_size=settings.batch_size, max_wall_s=settings.max_wall_s)
         if request.opening_chart_id:
             _, info = store.chart(request.opening_chart_id, 'opening_chart_id')
             if info['mode'] != mode:

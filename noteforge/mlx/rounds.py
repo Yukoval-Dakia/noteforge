@@ -1,4 +1,4 @@
-"""Rollout in rounds: cores of a round decode together, so steps are about the longest core per round, not all tokens.
+"""MLX rollout in rounds: cores of a round decode together, so steps are about the longest core per round, not all tokens.
 
 Round 0 has no history. A core in a later round sees the core before it when that one is already written."""
 import time

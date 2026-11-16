@@ -65,7 +65,7 @@ class DraftRequest(Strict):
     samples: int = Field(default=8, ge=1, le=16, description='Also the number of candidates available per section')
     profile: Literal['relaxed', 'standard', 'expert', 'none'] = Field(default='standard', description='Phira playability limits')
     seed: int = Field(default=0, ge=0, le=2**31-1)
-    plan: Literal['balanced', 'fast', 'sequential'] = Field(default='balanced', description='m3 backend only. balanced: 3 parallel rounds, quality matched the frozen setup on 100 songs. fast: 2 rounds, quicker, mania likeness fell clearly. sequential: core by core, the slowest')
+    plan: Literal['balanced', 'fast', 'sequential'] = Field(default='balanced', description='MLX backend only. balanced: 3 parallel rounds, quality matched the frozen setup on 100 songs. fast: 2 rounds, quicker, mania likeness fell clearly. sequential: core by core, the slowest')
     title: Optional[str] = Field(default=None, max_length=200)
     artist: Optional[str] = Field(default=None, max_length=200)
 

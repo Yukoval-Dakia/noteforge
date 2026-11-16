@@ -21,6 +21,7 @@ from dataclasses import asdict
 import gc
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
@@ -35,6 +36,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from noteforge.scripts import runtime as wb  # noqa: E402
+from noteforge.backends import configure_torch, mlx_identity, resolve_torch_device, torch_identity  # noqa: E402
 
 SCHEMA = 'noteforge.draft-song.v1'
 MODES = ('mania_4k', 'phira')
@@ -104,8 +106,7 @@ def write_json(path, value):
 
 
 def auto_device():
-    import torch
-    return 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+    return resolve_torch_device('auto')
 
 
 def tool_version(name):
@@ -132,6 +133,33 @@ def codec_constant(mode, codec, override_ms=None):
 
 
 # ------------------------------------------------------------------ model
+def build_model_on_meta(config, vocabulary, state):
+    """Construct the model on the meta device and copy the published weights in.
+
+    Variables are not learned at load time: every parameter is overwritten from the
+    checkpoint. Building on meta skips the random initialisation of ~223 Linear
+    layers (about 0.75 s of the 0.77 s construction on the Apple host measured in
+    docs/BACKENDS.md) and ``assign=True`` keeps the tensors instead of copying into
+    freshly allocated storage. Falls back to the ordinary path if this PyTorch
+    build rejects meta construction or the state is not a plain mapping.
+    """
+    import torch
+    from noteforge.model.full_event_model import FullEventModel
+    if not isinstance(state, dict):
+        model = FullEventModel(config, vocabulary)
+        model.load_state_dict(state, strict=True)
+        return model
+    try:
+        with torch.device('meta'):
+            model = FullEventModel(config, vocabulary)
+        model.load_state_dict(state, strict=True, assign=True)
+        model = model.to('cpu')
+    except Exception:  # noqa: BLE001 - any meta/assign incompatibility falls back to a plain load
+        model = FullEventModel(config, vocabulary)
+        model.load_state_dict(state, strict=True)
+    return model
+
+
 def load_model(path, device, weights='auto'):
     """Load a published r5 inference model -> (eval model, identity, declared mel normalization)."""
     import torch
@@ -149,8 +177,7 @@ def load_model(path, device, weights='auto'):
     state = saved['model']
     config = FullEventConfig(**saved['config'])
     vocabulary = dict(saved.get('vocabulary') or {})
-    model = FullEventModel(config, EventVocabulary(**vocabulary))
-    model.load_state_dict(state, strict=True)
+    model = build_model_on_meta(config, EventVocabulary(**vocabulary), state)
     model = model.to(device).eval()
     inference = saved.get('inference') or {}
     declared = inference.get('mel_normalization')
@@ -559,6 +586,8 @@ def parse_args(argv=None):
     p.add_argument('--audio', type=Path, required=True)
     p.add_argument('--out-dir', type=Path, required=True)
     p.add_argument('--model', type=Path, help='published r5 model weights')
+    p.add_argument('--backend', choices=('auto', 'torch', 'mlx'), default=os.environ.get('NOTEFORGE_BACKEND', 'auto'),
+                   help='auto prefers MLX on Apple Silicon when its exported weights are configured, else PyTorch')
     p.add_argument('--mode', choices=MODES)
     p.add_argument('--timing-segments', type=Path, help='JSON [[start_us, beat_us, meter], ...] on the playback clock: '
                    'full charter timing as a model input for any mode (exclusive with --timing and --beat-grid)')
@@ -598,7 +627,21 @@ def parse_args(argv=None):
                    help='mania: a hold releases >= MS before the next press of the same key, else it is shortened '
                         '(or becomes a tap); 0 disables (default 40: holds ending on the next note are unplayable)')
     p.add_argument('--seed', type=int, default=0, help='samples use seeds seed..seed+N-1')
-    p.add_argument('--device', choices=('cuda', 'mps', 'cpu'), help='default: cuda, else mps, else cpu')
+    p.add_argument('--device', choices=('auto', 'cuda', 'mps', 'cpu'), default=os.environ.get('NOTEFORGE_DEVICE', 'auto'),
+                   help='PyTorch device; auto: cuda, else mps, else cpu')
+    p.add_argument('--cpu-threads', type=int, help='PyTorch CPU intra-op threads (or NOTEFORGE_CPU_THREADS)')
+    p.add_argument('--cpu-interop-threads', type=int, help='PyTorch CPU inter-op threads (or NOTEFORGE_CPU_INTEROP_THREADS)')
+    p.add_argument('--reference-decode', action='store_true', help='disable the optimized static-cache decode loop')
+    p.add_argument('--no-cuda-graph', action='store_true', help='disable CUDA graph replay on NVIDIA GPUs')
+    p.add_argument('--autocast', choices=('bf16',), help='explicit bf16 decode; this changes the numerical path')
+    p.add_argument('--compile-decode', action='store_true', help='request torch.compile for the eager decode step')
+    p.add_argument('--mlx-weights', type=Path, default=os.environ.get('NOTEFORGE_FAST_WEIGHTS') or os.environ.get('MLX_FAST'),
+                   help='exported MLX fast-model folder')
+    p.add_argument('--mlx-mert', type=Path, default=os.environ.get('NOTEFORGE_FAST_MERT'),
+                   help='exported MLX fast-MERT folder')
+    p.add_argument('--mlx-cache-mb', type=int, default=300, help='MLX cache limit in MiB')
+    p.add_argument('--mlx-plan', choices=('balanced', 'fast', 'sequential'), default='balanced',
+                   help='MLX rollout plan')
     p.add_argument('--batch-size', type=int, default=64, help='rows (8 s cores) per generation batch')
     p.add_argument('--token-cap', type=int, default=4096, help='token cap per 8 s core')
     p.add_argument('--max-wall-s', type=float, default=14400., help='wall limit of the whole rollout')
@@ -612,7 +655,7 @@ def parse_args(argv=None):
                    'default: a temporary dir removed afterwards')
     p.add_argument('--extract-only', action='store_true', help='write the features (needs --features-dir) and stop')
     p.add_argument('--mert-source', help="pinned MERT-v2 directory, or 'hf' to download the pinned revision")
-    p.add_argument('--mert-device', choices=('cuda', 'mps', 'cpu'), help='default: --device')
+    p.add_argument('--mert-device', choices=('auto', 'cuda', 'mps', 'cpu'), help='default: --device')
     p.add_argument('--codec', help='audio codec name (ffprobe codec_name) when ffprobe is unavailable')
     p.add_argument('--clock-constant-ms', type=int, help='override the model->playback clock constant c')
     p.add_argument('--title')
@@ -660,6 +703,12 @@ def code_identity():
 def run(args, *, extractor=None, decoder=None):
     """Execute one draft (or extraction) and return the receipt; ``extractor`` / ``decoder`` are injectable."""
     started = time.monotonic()
+    requested_device = args.device or 'auto'
+    device = resolve_torch_device(requested_device)
+    changed_threads = configure_torch(getattr(args, 'cpu_threads', None), getattr(args, 'cpu_interop_threads', None))
+    args.device = device
+    if getattr(args, 'mert_device', None) == 'auto':
+        args.mert_device = device
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     receipt_path = out/'draft-receipt.json'
@@ -672,6 +721,17 @@ def run(args, *, extractor=None, decoder=None):
         raise SystemExit(f'--audio {audio_path} not found')
     receipt = dict(schema=SCHEMA, created_unix=time.time(), command=list(getattr(args, 'argv', None) or sys.argv),
                    code=code_identity(), complete=False)
+    active_backend = os.environ.get('NOTEFORGE_ACTIVE_BACKEND', 'torch')
+    receipt['runtime'] = dict(
+        backend=active_backend,
+        requested_backend=getattr(args, 'backend', 'torch'),
+        requested_device=requested_device,
+        control_device=device,
+        thread_overrides=changed_threads,
+        torch=torch_identity(device),
+    )
+    if active_backend == 'mlx':
+        receipt['runtime']['mlx'] = mlx_identity()
     timings = receipt['timings'] = {}
     temporary = keep is None
     features_dir = keep or Path(tempfile.mkdtemp(prefix='noteforge-draft-'))
@@ -688,7 +748,7 @@ def run(args, *, extractor=None, decoder=None):
                                 codec=codec, codec_source='--codec' if args.codec else
                                 'feature receipt (ffprobe at extraction)' if info.get('codec') else 'ffprobe',
                                 decoded_samples=feature_receipt['decoded_samples'],
-                                decoder=info.get('decoder'), database_decoder=DATABASE_FEATURES['decoder'])
+                                decoder=info.get('decoder'), database_decoder=FEATURE_CONTRACT['decoder'])
         receipt['features'] = dict(dir=str(features_dir), temporary=temporary, reused=feature_record['reused'],
                                    folder=feature_record['folder'],
                                    store='noteforge.inference.features.MertFeatureStore(root, <dir>/features)',
@@ -698,7 +758,6 @@ def run(args, *, extractor=None, decoder=None):
         if args.extract_only:
             receipt.update(complete=True, extract_only=True)
             return receipt
-        device = args.device or auto_device()
         tick = time.monotonic()
         model, model_identity, declared = load_model(args.model, device)
         plan = json.loads(Path(args.plan).read_text()) if args.plan else {}
@@ -898,10 +957,7 @@ def run(args, *, extractor=None, decoder=None):
             shutil.rmtree(features_dir, ignore_errors=True)
 
 
-def main(argv=None, *, extractor=None, decoder=None):
-    args = parse_args(argv)
-    args.argv = ['noteforge.scripts.draft_song', *(sys.argv[1:] if argv is None else argv)]
-    receipt = run(args, extractor=extractor, decoder=decoder)
+def _print_receipt(receipt, args):
     if receipt.get('extract_only'):
         print(json.dumps(dict(features=receipt['features']['folder'], audio_sha256=receipt['audio']['sha256'],
                               codec=receipt['audio']['codec'], timings=receipt['timings']), indent=1))
@@ -910,6 +966,31 @@ def main(argv=None, *, extractor=None, decoder=None):
         print(json.dumps(dict(chart=export.get('osz') or export['chart'].get('path'), notes=receipt['draft']['notes'],
                               clock_shift_ms=receipt['clock']['c_ms'], receipt=str(Path(args.out_dir)/'draft-receipt.json'),
                               timings={k: round(v, 3) for k, v in receipt['timings'].items()}), indent=1))
+
+
+def main(argv=None, *, extractor=None, decoder=None):
+    raw = list(sys.argv[1:] if argv is None else argv)
+    args = parse_args(raw)
+    args.argv = ['noteforge.scripts.draft_song', *raw]
+    if args.backend in ('auto', 'mlx'):
+        from noteforge.backends import resolve_backend
+        target = resolve_backend(args.backend, args.device, args.mlx_weights, args.mlx_mert)
+        if target.backend == 'mlx':
+            if not target.ready:
+                raise SystemExit(target.error)
+            stride = dict(fast='2', balanced='-2').get(args.mlx_plan)
+            env = dict(MLX_FAST=str(args.mlx_weights), MLX_CACHE_MB=str(args.mlx_cache_mb),
+                       NOTEFORGE_FAST_WEIGHTS=str(args.mlx_weights),
+                       NOTEFORGE_FAST_MERT=str(args.mlx_mert),
+                       NOTEFORGE_ACTIVE_BACKEND='mlx')
+            if stride:
+                env['MLX_STRIDE'] = stride
+            from noteforge.mlx import draft_mlx
+            receipt = draft_mlx.run(raw, env)
+            _print_receipt(receipt, args)
+            return receipt
+    receipt = run(args, extractor=extractor, decoder=decoder)
+    _print_receipt(receipt, args)
     return receipt
 
 

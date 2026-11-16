@@ -1,0 +1,391 @@
+{
+  "schema": "noteforge.backend-benchmark.v1",
+  "date": "2026-11-16",
+  "note": "Real measurements. Synthetic 8 s fixture measures runtime only; the 100.1 s row uses a real licensed song kept out of the repo. Output SHA is the note multiset hash, so identical SHA across backends means identical events.",
+  "weights": {
+    "file": "models/noteforge-r5.pt",
+    "sha256": "1b1f2e8dee82101690778ef667b661fa1d88421f50034c0bd97572f3067d405b",
+    "params": 321726983,
+    "format": "noteforge.finalmodelv1"
+  },
+  "hosts": {
+    "apple_arm64": {
+      "machine": "arm64",
+      "cpu": "Apple Silicon, 8 cores",
+      "memory_bytes": 17179869184,
+      "os": "macOS-27.3-arm64-arm-64bit",
+      "torch": "2.15.0",
+      "mlx": "0.32.4",
+      "mkldnn": false,
+      "python": "3.12.13",
+      "cpu_brand": "Apple M3",
+      "notes": "CPU brand string recorded as measurement provenance; the NoteForge backend name is mlx, not a hardware SKU."
+    }
+  },
+  "x86_64": {
+    "status": "not measured on this host",
+    "runner": ".github/workflows/cpu-x86-benchmark.yml (manual, ubuntu-latest x86_64)"
+  },
+  "nvidia_cuda": {
+    "status": "not measured: no NVIDIA device in this environment",
+    "code_paths": [
+      "noteforge.backends.resolve_torch_device",
+      "noteforge.model.full_event_generate cuda_graph/autocast"
+    ]
+  },
+  "runs": [
+    {
+      "name": "torch_cpu_thread_sweep",
+      "fixture": "synthetic 8 s fixture (real feature contract, synthetic values)",
+      "backend": "torch",
+      "device": "cpu",
+      "batch_size": 1,
+      "scheduler": "continuous",
+      "reference_decode": false,
+      "rows": [
+        {
+          "threads": 1,
+          "runs": 5,
+          "generation_median_s": 1.5325,
+          "generation_range_s": [
+            1.5295,
+            1.5468
+          ],
+          "tokens": 78,
+          "notes": 11,
+          "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+        },
+        {
+          "threads": 2,
+          "runs": 5,
+          "generation_median_s": 1.5748,
+          "generation_range_s": [
+            1.5592,
+            1.6205
+          ],
+          "tokens": 78,
+          "notes": 11,
+          "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+        },
+        {
+          "threads": 4,
+          "runs": 5,
+          "generation_median_s": 1.5601,
+          "generation_range_s": [
+            1.545,
+            1.5766
+          ],
+          "tokens": 78,
+          "notes": 11,
+          "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+        },
+        {
+          "threads": 8,
+          "runs": 5,
+          "generation_median_s": 1.5545,
+          "generation_range_s": [
+            1.5443,
+            1.5642
+          ],
+          "tokens": 78,
+          "notes": 11,
+          "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+        }
+      ]
+    },
+    {
+      "name": "torch_cpu_decode_loop",
+      "fixture": "synthetic 8 s fixture",
+      "backend": "torch",
+      "device": "cpu",
+      "runs_per_arm": 5,
+      "summary": {
+        "fast": {
+          "runs": 5,
+          "ok": 5,
+          "generation_median_s": 1.5623,
+          "generation_range_s": [
+            1.5185,
+            1.5906
+          ],
+          "tokens": 78,
+          "tokens_per_s": 49.926,
+          "outputs": [
+            "0dea747d8e6a86067180b644d5bd5f83ea224b0f27f6d18ec1e32853a543f9c2"
+          ]
+        },
+        "reference": {
+          "runs": 5,
+          "ok": 5,
+          "generation_median_s": 1.9048,
+          "generation_range_s": [
+            1.886,
+            1.9197
+          ],
+          "tokens": 78,
+          "tokens_per_s": 40.949,
+          "outputs": [
+            "0dea747d8e6a86067180b644d5bd5f83ea224b0f27f6d18ec1e32853a543f9c2"
+          ]
+        }
+      }
+    },
+    {
+      "name": "torch_cpu_compile_decode",
+      "fixture": "synthetic 8 s fixture",
+      "backend": "torch",
+      "device": "cpu",
+      "flag": "--compile-decode",
+      "runs": [
+        {
+          "run": 1,
+          "generation_s": 6.5609
+        },
+        {
+          "run": 2,
+          "generation_s": 6.5867
+        },
+        {
+          "run": 3,
+          "generation_s": 6.612
+        }
+      ],
+      "cold_run_generation_s": 46.2257,
+      "baseline_generation_s": 1.5601,
+      "conclusion": "torch.compile on this Apple CPU path is ~4.2x slower than eager; no CPU gain from --compile-decode here."
+    },
+    {
+      "name": "torch_cpu_autocast_bf16",
+      "fixture": "synthetic 8 s fixture",
+      "backend": "torch",
+      "device": "cpu",
+      "flag": "--autocast bf16",
+      "runs": [
+        {
+          "run": 0,
+          "generation_s": 3.4023
+        },
+        {
+          "run": 1,
+          "generation_s": 3.3451
+        },
+        {
+          "run": 2,
+          "generation_s": 3.3678
+        }
+      ],
+      "tokens": 78,
+      "notes": 11,
+      "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89",
+      "fp32_output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89",
+      "same_events_as_fp32": true,
+      "conclusion": "bf16 autocast on this Apple CPU path is ~2.2x slower than fp32 (median 3.368 s vs 1.556 s) with identical events. It is slower, but it does not change the chart here."
+    },
+    {
+      "name": "torch_mps",
+      "fixture": "synthetic 8 s fixture",
+      "backend": "torch",
+      "device": "mps",
+      "runs": 5,
+      "batch_size": 1,
+      "generation_median_s": 1.6106,
+      "generation_range_s": [
+        1.6095,
+        5.2528
+      ],
+      "first_run_cold_s": 5.2528,
+      "output_sha256": [
+        "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+      ]
+    },
+    {
+      "name": "mlx_warm",
+      "fixture": "synthetic 8 s fixture",
+      "backend": "mlx",
+      "device": "mlx (Apple GPU via MLX)",
+      "runs": 5,
+      "batch_size": 1,
+      "generation_median_s": 2.3205,
+      "generation_range_s": [
+        2.3123,
+        2.3492
+      ],
+      "first_run_cold_generation_s": 2.3492,
+      "output_sha256": [
+        "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89"
+      ],
+      "note": "batch-size 1 is a declared slow point for MLX; see the 100.1 s row at batch-size 64"
+    },
+    {
+      "name": "long_song_batch64",
+      "fixture": {
+        "audio_sha256": "535386bc98ebabc03b66e7035d62447c0b8cffc530abb1107be593b4b77073a5",
+        "duration_s": 100.106,
+        "source": "real licensed song, kept out of this repository"
+      },
+      "batch_size": 64,
+      "seeds": 1,
+      "mode": "phira",
+      "level": 10,
+      "profile": "standard",
+      "rows": [
+        {
+          "name": "torch CPU, 4 threads",
+          "backend": "torch",
+          "device": "cpu",
+          "generation_s": 42.114,
+          "wall_s": 45.228,
+          "tokens": 2029,
+          "notes": 281,
+          "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725"
+        },
+        {
+          "name": "mlx balanced",
+          "backend": "mlx",
+          "device": "mlx",
+          "generation_s": 28.345,
+          "wall_s": 29.948,
+          "tokens": 2029,
+          "notes": 281,
+          "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725"
+        },
+        {
+          "name": "mlx fast",
+          "backend": "mlx",
+          "device": "mlx",
+          "generation_s": 18.581,
+          "wall_s": 20.004,
+          "tokens": 2029,
+          "notes": 281,
+          "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725"
+        }
+      ],
+      "identical_events": true,
+      "extra": {
+        "mlx_at_batch_size_1_s": 91.257,
+        "note": "MLX at batch-size 1 is slower than torch CPU; batch shape is part of the MLX contract."
+      }
+    },
+    {
+      "name": "long_song_thread_sweep",
+      "fixture": {
+        "duration_s": 100.106,
+        "audio_sha256": "535386bc98ebabc03b66e7035d62447c0b8cffc530abb1107be593b4b77073a5",
+        "source": "real licensed song, kept out of this repository"
+      },
+      "backend": "torch",
+      "device": "cpu",
+      "batch_size": 64,
+      "scheduler": "grouped",
+      "mode": "phira",
+      "level": 10,
+      "profile": "standard",
+      "runs_per_arm": 2,
+      "rows": [
+        {
+          "cpu_threads": 1,
+          "interop_threads": 1,
+          "generation_s": [
+            40.627,
+            41.022
+          ],
+          "median_s": 40.825
+        },
+        {
+          "cpu_threads": 2,
+          "interop_threads": 1,
+          "generation_s": [
+            41.43,
+            41.437
+          ],
+          "median_s": 41.433
+        },
+        {
+          "cpu_threads": 4,
+          "interop_threads": 1,
+          "generation_s": [
+            41.207,
+            41.093
+          ],
+          "median_s": 41.15
+        },
+        {
+          "cpu_threads": 6,
+          "interop_threads": 1,
+          "generation_s": [
+            40.393,
+            40.804
+          ],
+          "median_s": 40.599
+        },
+        {
+          "cpu_threads": 8,
+          "interop_threads": 1,
+          "generation_s": [
+            41.104,
+            40.476
+          ],
+          "median_s": 40.79
+        },
+        {
+          "cpu_threads": 4,
+          "interop_threads": 4,
+          "generation_s": [
+            41.133,
+            41.078
+          ],
+          "median_s": 41.106
+        },
+        {
+          "cpu_threads": 8,
+          "interop_threads": 8,
+          "generation_s": [
+            40.944,
+            41.118
+          ],
+          "median_s": 41.031
+        }
+      ],
+      "output_sha256": "fd95fcdcf7b8d1693a385f5ae602e2a12f0088c45b059bdd9a1a1c3034b8c725",
+      "conclusion": "Thread count and interop threads do not change whole-song generation on this Apple CPU path; the 1-8 thread spread is under 2%, so decode here is latency/memory bound rather than matmul bound."
+    },
+    {
+      "name": "model_load_optimization",
+      "what": "FullEventModel is constructed on the meta device and the published weights are assigned into it (assign=True), skipping the random initialisation of ~223 Linear layers that load_state_dict immediately overwrites.",
+      "isolated_load_model_s": {
+        "before": 1.338,
+        "after": [
+          0.972,
+          0.519,
+          0.517
+        ]
+      },
+      "in_harness_model_load_s": {
+        "before_median": 1.344,
+        "after_median": 0.992
+      },
+      "equivalence": "All 395 parameters and buffers are bit-identical to the plain construction (worst abs diff 0.0), and the fixed-input event SHA is unchanged.",
+      "output_sha256": "36959f5b89194e4abaa7c7f6199589edd68f35d2498cbb05386efd167beece89",
+      "fallback": "noteforge.scripts.draft_song.build_model_on_meta falls back to the ordinary construct+load path on any meta/assign incompatibility."
+    },
+    {
+      "name": "int8_dynamic_quantization_arm",
+      "platform": "Apple ARM64, torch 2.15.0",
+      "result": "unavailable",
+      "error": "RuntimeError: Didn't find engine for operation quantized::linear_prepack NoQEngine",
+      "conclusion": "The Apple ARM CPU PyTorch build has no quantized engine; int8 CPU inference cannot run here. Not a model limitation."
+    }
+  ],
+  "conclusions": [
+    "torch CPU generation is thread-count insensitive on this short fixture: 1/2/4/8 threads all land within 1.53-1.57 s.",
+    "fast decode is a stable ~1.20x speedup over reference decode on this fixture with identical events.",
+    "torch.compile on this Apple CPU path is far slower (~6.6 s vs ~1.56 s); --compile-decode is not a CPU gain here.",
+    "bf16 autocast on this Apple CPU path is ~2.2x slower than fp32 (3.37 s vs 1.56 s) and produced identical events; it is not a CPU speedup.",
+    "MLX beats torch CPU on a 100 s song at batch-size 64 (18.6-28.3 s vs ~41 s) and is slower at batch-size 1.",
+    "inference_mode replaced no_grad on the decode entry points: 100 s song median 40.995 s vs 41.755 s (n=3 each, ~1.8% faster) with identical events.",
+    "Every backend produced the same event multiset on both fixtures when hashed with the repository's note_hash.",
+    "On the 100 s song, 1-8 CPU threads and 1-8 interop threads all land within 2%; raising the thread count is not a CPU speedup on this Apple host.",
+    "Model construction on meta + assign=True cut weight loading from 1.338 s to ~0.52 s with bit-identical parameters.",
+    "int8 dynamic quantization is unavailable on the Apple ARM PyTorch 2.15.0 build (NoQEngine); x86_64 may differ and must be measured there."
+  ]
+}

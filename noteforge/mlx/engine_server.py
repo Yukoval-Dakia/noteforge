@@ -15,11 +15,11 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE.parents[1]), str(HERE)]
 path, weights = sys.argv[1], sys.argv[2]
 idle = float(sys.argv[3]) if len(sys.argv) > 3 else 300.
-os.environ['M3_FAST'] = weights
-from noteforge.m3 import draft_m3
+os.environ['MLX_FAST'] = weights
+from noteforge.mlx import draft_mlx
 from noteforge_api import ops
-ops.WARM_DRAFT = draft_m3.run
-draft_m3.load(None, None, None)  # load now: the first call should already be fast
+ops.WARM_DRAFT = draft_mlx.run
+draft_mlx.load(None, None, None)  # load now: the first call should already be fast
 
 Path(path).unlink(missing_ok=True)
 server = socket.socket(socket.AF_UNIX)
@@ -53,7 +53,7 @@ try:
                 except Exception:  # noqa: BLE001 - one bad call must not end the engine
                     traceback.print_exc()
                     code = 1
-            draft_m3.mx.clear_cache()
+            draft_mlx.mx.clear_cache()
             conn.sendall((json.dumps(dict(returncode=code, stdout=out.getvalue(), stderr=err.getvalue()))+'\n').encode())
 finally:
     Path(path).unlink(missing_ok=True)

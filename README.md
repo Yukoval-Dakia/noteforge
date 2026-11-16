@@ -10,7 +10,7 @@ NoteForge 给一首歌生成可编辑的节奏谱草稿：Phira / Phigros 风格
 |---|---|---|
 | 推理引擎 | `noteforge/` | MERT-v2 + 10 ms mel 特征、整曲滚动生成、共识聚合、谱面解析与导出 |
 | HTTP 接口 | `noteforge_api/` | 上传音频或已有谱、异步生成、分段选择、修订、导出；OpenAPI 见 `openapi.json` |
-| 可选 MLX 路径 | `noteforge/m3/` | Apple Silicon 上的 fp16 推理镜像 |
+| Apple MLX 路径 | `noteforge/mlx/` | Apple Silicon 上的独立 fp16 图执行实现 |
 | 辅助权重 | `models/planner_f/`、`noteforge/placement/` | 密度曲线规划器和 Phira 位置摆放模型 |
 | 推理合同 | `models/config/` | 冻结的 mel 归一化系数和 r5 推理参数 |
 | 权重清单 | `models/MANIFEST.json` | 每个权重文件的字节数和 SHA-256 |
@@ -30,7 +30,7 @@ shasum -a 256 models/noteforge-r5.pt
 
 小权重和推理系数已随仓分发；`models/MANIFEST.json` 给出全部 SHA。`noteforge.finalmodelv1` 文件只含 config、vocabulary、EMA 权重和推理合同，不含 optimizer、训练计划或语料信息。公开 mel 系数只含 128 维 mean/std 及其 SHA。
 
-MERT-v2 编码器权重不在本仓库。代码固定 `m-a-p/MERT-v2-FullSong` revision `7001f7657276238629e61c7746ce70735e0604c0`，可用 `--mert-source hf` 下载，或提供包含固定 SHA 文件的本地快照。首次真实特征提取需要该编码器和 `ffmpeg`/`ffprobe`。
+MERT-v2 编码器权重不在本仓库。代码固定 `m-a-p/MERT-v2-FullSong` revision `7001f7657276238629e61c7746ce70735e0604c0`，可用 `--mert-source hf` 下载，或提供包含固定 SHA 文件的本地快照。首次真实特征提取需要该编码器、`torchaudio` 和 `ffmpeg`/`ffprobe`。
 
 ## 安装与命令行
 
@@ -39,6 +39,58 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[api]'
 # 系统依赖：ffmpeg / ffprobe
 ```
+
+## 推理后端
+
+| `NOTEFORGE_BACKEND` | 设备 | 实现 |
+|---|---|---|
+| `auto` | 自动 | Apple arm64 且配置了 MLX 导出权重时选 `mlx`，否则选 `torch` |
+| `mlx` | Apple Silicon | `mlx.core` fp16 静态缓存解码；MERT 前端使用 PyTorch MPS |
+| `torch` + `NOTEFORGE_DEVICE=auto` | CUDA / MPS / CPU | PyTorch，按 NVIDIA、Apple Metal、CPU 的顺序选择 |
+| `torch` + `NOTEFORGE_DEVICE=cuda` | NVIDIA | bf16 autocast（显式开启）、静态缓存和 CUDA Graph |
+| `torch` + `NOTEFORGE_DEVICE=cpu` | x86_64 / arm64 CPU | PyTorch CPU/oneDNN/Accelerate 路径，可控制线程数 |
+
+`mlx`、`mps`、`cuda` 和 `cpu` 是不同后端，不共用性能结论。`auto` 只有在 Apple arm64、已安装 `mlx` 且存在下面两套导出权重时才会选择 MLX。
+
+### Apple Silicon MLX
+
+```bash
+pip install -e '.[api,mlx]'
+
+# 主模型 fp16 MLX 导出
+python -m noteforge.mlx.fast_model export models/noteforge-r5.pt ./models/mlx-fast
+
+# 固定 MERT-v2 的 bf16 快速前端
+python -m noteforge.mlx.mert_fast export /path/to/pinned-mert2 ./models/mlx-mert
+
+export NOTEFORGE_BACKEND=mlx
+export NOTEFORGE_FAST_WEIGHTS=$PWD/models/mlx-fast
+export NOTEFORGE_FAST_MERT=$PWD/models/mlx-mert
+NOTEFORGE_API_TOKEN=secret uvicorn noteforge_api.asgi:app --port 8787
+```
+
+MLX 生成分支的默认计划是 `balanced`。API 请求里的 `plan` 可取 `balanced`、`fast` 或 `sequential`；这些是解码调度差异，不改变 r5 权重或共识规则。
+
+### x86_64 / ARM64 CPU
+
+```bash
+NOTEFORGE_BACKEND=torch NOTEFORGE_DEVICE=cpu \
+NOTEFORGE_CPU_THREADS=8 NOTEFORGE_CPU_INTEROP_THREADS=1 \
+NOTEFORGE_API_TOKEN=secret uvicorn noteforge_api.asgi:app --port 8787
+```
+
+CLI 同样支持 `--device cpu --cpu-threads N --cpu-interop-threads N`。x86_64 和 ARM64 共用 PyTorch 推理合同，但 BLAS/oneDNN/Accelerate 实现不同，发布性能时必须分别注明 CPU 架构、线程数和 torch/BLAS 版本。
+
+### NVIDIA CUDA
+
+```bash
+NOTEFORGE_BACKEND=torch NOTEFORGE_DEVICE=cuda \
+NOTEFORGE_API_TOKEN=secret uvicorn noteforge_api.asgi:app --port 8787
+```
+
+默认启用静态缓存、连续调度和 CUDA Graph；`NOTEFORGE_DECODE_CUDA_GRAPH=0` 可关闭图捕获。CLI 的 `--autocast bf16` 是显式数值路径变更，不能和 fp32 输出称为逐位等价。`--reference-decode` 可回退到参考解码循环用于对照。
+
+`GET /v1/health` 返回实际选中的 `backend`、`device`，以及请求值和后端错误；`GET /v1/capabilities` 还会列出当前可用的 PyTorch/MLX 能力。
 
 从仓库根目录执行：
 
@@ -71,7 +123,7 @@ NOTEFORGE_API_TOKEN=secret \
 uvicorn noteforge_api.asgi:app --host 0.0.0.0 --port 8787
 ```
 
-默认模型、推理合同、规划器和 mel 系数都在仓库内；可用 `NOTEFORGE_MODEL`、`NOTEFORGE_PLAN`、`NOTEFORGE_PLANNER_DIR`、`NOTEFORGE_MEL_STATS`、`NOTEFORGE_DEVICE` 覆盖。流程是 `POST /v1/audio` → `POST /v1/drafts` → 轮询 `GET /v1/drafts/{id}` → `GET /v1/drafts/{id}/events` 或 `/chart`。交互文档在 `/docs`，机器描述在 `openapi.json`。
+默认模型、推理合同、规划器和 mel 系数都在仓库内；可用 `NOTEFORGE_MODEL`、`NOTEFORGE_PLAN`、`NOTEFORGE_PLANNER_DIR`、`NOTEFORGE_MEL_STATS`、`NOTEFORGE_BACKEND`、`NOTEFORGE_DEVICE`、`NOTEFORGE_FAST_WEIGHTS`、`NOTEFORGE_FAST_MERT` 覆盖。流程是 `POST /v1/audio` → `POST /v1/drafts` → 轮询 `GET /v1/drafts/{id}` → `GET /v1/drafts/{id}/events` 或 `/chart`。交互文档在 `/docs`，机器描述在 `openapi.json`。
 
 `NOTEFORGE_FAKE_ENGINE=1` 用确定性假音符跑通接口、修订和导出，仅用于测试，不能代表模型质量。
 
@@ -80,9 +132,28 @@ uvicorn noteforge_api.asgi:app --host 0.0.0.0 --port 8787
 ```bash
 pip install -e '.[dev,api]'
 NOTEFORGE_API_TOKEN=secret python -m pytest tests/test_api.py -q
+python -m pytest tests/test_runtime.py -q
 ```
 
 该测试覆盖鉴权、上传、草稿状态、分段、修订和两种谱面导出；生成步骤使用假引擎，后处理使用真实代码。真实整曲生成还需下载主模型和 MERT-v2 编码器，且需要足够显存或 Apple Silicon。
+
+## 基准测量
+
+同一音频、seed 和解码合同下比较后端：
+
+```bash
+python -m noteforge.scripts.make_bench_fixture --out ./bench --seconds 8
+python -m noteforge.scripts.bench_backends \
+  --backend torch --device cpu --cpu-threads 4 \
+  --audio ./bench/silence.wav --features-dir ./bench \
+  --mode phira --level 10 --batch-size 64 --runs 3
+```
+
+`bench_backends` 输出模型加载、生成、总墙钟、token 数、音符数和事件 SHA，不删音符、不改共识、不跳过合法性检查。合成夹具只测运行时，不代表谱面质量。x86_64 数字必须来自 x86_64 主机；仓库提供 `.github/workflows/cpu-x86-benchmark.yml` 手动跑真实 x86 runner。
+
+已在 Apple Silicon（arm64，8 核）、`torch` 2.15.0、`mlx` 0.32.4 上实测的结论见 [docs/BACKENDS.md](docs/BACKENDS.md) 和原始行 [reports/backend-benchmark-20261116.json](reports/backend-benchmark-20261116.json)。要点：100.1 s 整曲 `batch-size 64` 下 torch CPU 约 41 s、MLX `balanced` 28.3 s、MLX `fast` 18.6 s，三者事件完全一致；CPU 线程数（1–8）在这条路径上差异 <2%；`--compile-decode` 和 CPU 上的 `--autocast bf16` 都更慢。CUDA 与 x86_64 尚无本机数字，没有实测就不发布数值。
+
+发布任何后端性能结论时，需要同时给出：机器与 CPU 架构、线程数、torch/MLX 版本、设备、批大小、模型加载时间、生成时间、整曲墙钟、RSS、固定 seed 输出 SHA 和失败边界。
 
 ## 许可证与归属
 

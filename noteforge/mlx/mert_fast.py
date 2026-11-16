@@ -85,7 +85,7 @@ def fast_extractor(folder):
         from noteforge.audio.mert2 import Mert2Spec
         from noteforge.audio.mert_attention import install_query_chunks
         if device != 'mps':
-            raise SystemExit('the fast path runs on mps only: CPU took 119 s and its features differed')
+            raise SystemExit('the MLX fast feature path uses PyTorch MPS for MERT; pass --mert-device mps')
         tick = time.monotonic()
         model = light_model(folder)
         result = model.load_state_dict(load_file(str(folder/'model.safetensors')), strict=False, assign=True)

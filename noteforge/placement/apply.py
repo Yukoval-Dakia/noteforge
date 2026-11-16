@@ -10,7 +10,10 @@ from noteforge.events.phira_rpe import plain_background, rpe
 KIND={'tap':0,'hold':1,'flick':2,'drag':3}
 def layout(ev,net,T=.8,seed=0):
     ev=sorted(ev,key=lambda e:(e['onset_us'],e['type']!='hold'))
-    a=np.array([(e['onset_us']/1e6,e['end_us']/1e6,KIND[e['type']],0.) for e in ev],np.float32); f=torch.as_tensor(feats(a))[None]
+    if not ev:
+        return []
+    a=np.array([(e['onset_us']/1e6,e['end_us']/1e6,KIND[e['type']],0.) for e in ev],np.float32).reshape(-1,4)
+    f=torch.as_tensor(feats(a))[None]
     g=torch.Generator().manual_seed(seed); st=None; prev=NB; xs=[]; near=[]
     c=(BINS[:-1]+BINS[1:])/2
     with torch.no_grad():

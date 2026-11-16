@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[dev,api]'
+      - run: python -m compileall -q noteforge noteforge_api tests
+      - run: python -m pytest tests/test_api.py tests/test_runtime.py -q
+        env:
+          NOTEFORGE_API_TOKEN: secret

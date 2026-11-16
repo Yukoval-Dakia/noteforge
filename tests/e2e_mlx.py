@@ -1,4 +1,7 @@
-"""Real model on the M3 through HTTP: draft, continue, regenerate, download. e2e_m3.py BASE TOKEN_FILE OUT AUDIO HUMAN_ZIP"""
+"""Real MLX model through HTTP: draft, continue, regenerate and download.
+
+e2e_mlx.py BASE TOKEN_FILE OUT AUDIO HUMAN_ZIP [PLAN]
+"""
 import json, sys, time, zipfile
 from pathlib import Path
 import httpx
@@ -27,4 +30,4 @@ for cut in (120000., 120000., 60000., 150000.):
     k = lambda n: (n['time_ms'], n['end_ms'], n['type'], n.get('x'))
     srt = lambda L: sorted(L, key=lambda t: tuple(-1 if v is None else v for v in (t[0], t[1])) + (t[2], t[3] if t[3] is not None else 0))
     print('  kept identical', srt([k(n) for n in ev['notes'] if n['time_ms'] < cut]) == srt([k(n) for n in e['notes'] if n['time_ms'] < cut]), 'new notes', sum(n['time_ms'] >= cut for n in e['notes']), 'warnings', e['warnings'], flush=True)
-f = c.get(f'/v1/drafts/{d}/chart'); print('chart', f.status_code, len(f.content), flush=True); (out/'hug-m3.zip').write_bytes(f.content)
+f = c.get(f'/v1/drafts/{d}/chart'); print('chart', f.status_code, len(f.content), flush=True); (out/'hug-mlx.zip').write_bytes(f.content)

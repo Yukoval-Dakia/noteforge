@@ -46,7 +46,7 @@ def progress(draft, stage, message=''):
     write_json(Path(draft)/'progress.json', dict(stage=stage, message=message))
 
 
-WARM_DRAFT = None  # set by noteforge/m3/engine_server.py: run the draft in this process, on the loaded model
+WARM_DRAFT = None  # set by noteforge/mlx/engine_server.py: run the draft in this process, on the loaded model
 
 
 def run(command, log, env=None):
@@ -66,7 +66,7 @@ def run(command, log, env=None):
             sys.argv = saved
             sys.path[:] = saved_path  # the planner adds its folder, whose apply.py would hide the placement model's
         return
-    if WARM_DRAFT is not None and command[1].endswith('draft_m3.py'):
+    if WARM_DRAFT is not None and command[1].endswith('draft_mlx.py'):
         import contextlib
         with open(log, 'a') as out, contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
             try:
@@ -191,22 +191,22 @@ def fake_samples(request, resolved):
                 timing_points=None, style=request.get('style') or {}, level=request.get('level'))
 
 
-def m3_env(resolved, plan):
-    """How the M3 path decodes: plan 'fast' is 2 rounds, 'balanced' adds a rewrite round, 'sequential' is core by core."""
-    env = dict(M3_FAST=resolved['fast_weights'], M3_CACHE_MB='300')
+def mlx_env(resolved, plan):
+    """How the MLX path decodes: plan 'fast' is 2 rounds, 'balanced' adds a rewrite round, 'sequential' is core by core."""
+    env = dict(MLX_FAST=resolved['fast_weights'], MLX_CACHE_MB='300')
     stride = dict(fast='2', balanced='-2').get(plan)
     if stride:
-        env['M3_STRIDE'] = stride
+        env['MLX_STRIDE'] = stride
     return env
 
 
 def draft_command(py, request, resolved, curve_path, ratios, mert):
-    mode, m3 = request['mode'], resolved.get('backend') == 'm3'
+    mode, mlx = request['mode'], resolved.get('backend') == 'mlx'
     common = ['--audio', resolved['audio_path'], '--mode', mode, '--features-dir', resolved['features_dir'], '--plan', resolved['plan'],
               '--seed', request['seed'], '--max-wall-s', resolved['max_wall_s'], '--field-temperature', FIELD_TEMPERATURE,
               '--history-reference', '--density-curve', curve_path, '--profile', 'none', '--kind-as-band', *ratios]
-    if m3:
-        return [py, ROOT/'noteforge/m3/draft_m3.py', *common, '--model', 'frozen', '--mel-stats', resolved['mel_stats'], '--device', 'cpu',
+    if mlx:
+        return [py, ROOT/'noteforge/mlx/draft_mlx.py', *common, '--model', 'frozen', '--mel-stats', resolved['mel_stats'], '--device', 'cpu',
                 '--batch-size', resolved['batch_size'], '--scheduler', 'grouped']
     return [py, '-m', 'noteforge.scripts.draft_song', *common, '--model', resolved['model'], '--device', resolved['device'],
             '--batch-size', resolved['batch_size'], '--scheduler', 'continuous', *mert]
@@ -223,8 +223,8 @@ def extract_features(resolved, draft):
         import shutil
         shutil.rmtree(extract)
     audio, features, log = resolved['audio_path'], resolved['features_dir'], draft/'engine.log'
-    if resolved.get('backend') == 'm3':
-        run([resolved.get('mert_python') or py, ROOT/'noteforge/m3/mert_fast.py', 'extract', resolved['fast_mert'], '--extract-only', '--audio', audio,
+    if resolved.get('backend') == 'mlx':
+        run([resolved.get('mert_python') or py, ROOT/'noteforge/mlx/mert_fast.py', 'extract', resolved['fast_mert'], '--extract-only', '--audio', audio,
              '--features-dir', features, '--out-dir', extract, '--device', 'mps', '--mert-device', 'mps', '--mert-source', 'frozen'], log)
     else:
         mert = ['--mert-source', resolved['mert_source']] if resolved.get('mert_source') else []
@@ -242,14 +242,14 @@ def real_samples(request, resolved, draft, features_ready=False):
     sha = request['audio_id']
     mert = ['--mert-source', resolved['mert_source']] if resolved.get('mert_source') else []
 
-    m3 = resolved.get('backend') == 'm3'
+    mlx = resolved.get('backend') == 'mlx'
     if not features_ready:
         extract_features(resolved, draft)
 
     progress(draft, 'planning', 'planning density and style')
     curve_path = work/'curve.json'
     command = [py, ROOT/'noteforge/planner/plan_song.py', '--features-dir', features/'features', '--audio-sha', sha, '--mode', mode,
-               '--planner-dir', resolved['planner_dir'], '--device', 'cpu' if m3 else resolved['device'], '--out', curve_path]
+               '--planner-dir', resolved['planner_dir'], '--device', 'cpu' if mlx else resolved['device'], '--out', curve_path]
     if request.get('level') is not None:
         command += ['--density', request['level']]
     run(command, log)
@@ -269,7 +269,7 @@ def real_samples(request, resolved, draft, features_ready=False):
 
     samples = request['samples']
     base = draft_command(py, request, resolved, curve_path, ratios, mert)
-    env = m3_env(resolved, request.get('plan') or 'balanced') if m3 else None
+    env = mlx_env(resolved, request.get('plan') or 'balanced') if mlx else None
     (draft/'draft_base.json').write_text(json.dumps(dict(command=[str(x) for x in base], env=env)))
     final = [*base, '--out-dir', work/'draft', '--consensus', samples, '--consensus-pattern', 'anchor', '--save-samples']
     if samples > 1:
@@ -285,7 +285,7 @@ def real_samples(request, resolved, draft, features_ready=False):
     elif timing.get('bpm'):
         progress(draft, 'timing', 'finding the beat phase')
         first = work/'first_pass'
-        run([*base, '--out-dir', first, '--consensus', 1 if m3 else 4, *([] if m3 else ['--consensus-pattern', 'anchor', '--consensus-votes', 2])], log, env)
+        run([*base, '--out-dir', first, '--consensus', 1 if mlx else 4, *([] if mlx else ['--consensus-pattern', 'anchor', '--consensus-votes', 2])], log, env)
         events = json.loads((first/'draft-events.json').read_text())['events']
         if not events:
             raise OpError('no_notes', 'the first pass produced no notes, so the beat phase is unknown')
@@ -510,9 +510,9 @@ def continue_draft(draft, spec):
         at = command.index('--seed')
         command[at+1] = str(spec['seed'])
         if not base.get('env'):
-            raise OpError('unsupported', 'continuing is available on the m3 backend')
-        # M3_CONTINUE goes through the rounds rollout: 'sequential' continues in 2 rounds too.
-        env = dict(base['env'], M3_CONTINUE=str(spec_file), M3_STRIDE=base['env'].get('M3_STRIDE', '2'))
+            raise OpError('unsupported', 'continuing is available on the MLX backend')
+        # MLX_CONTINUE goes through the rounds rollout: 'sequential' continues in 2 rounds too.
+        env = dict(base['env'], MLX_CONTINUE=str(spec_file), MLX_STRIDE=base['env'].get('MLX_STRIDE', '2'))
         run(command, draft/'engine.log', env)
         written = json.loads((out/'draft-samples.json').read_text())['samples'][0]
         notes = [[n[0]-shift, n[1]-shift, n[2], n[3]] for n in written if n[0]-shift >= cut]

@@ -51,7 +51,23 @@ def draft(c, mode='phira', **over):
 def test_token_is_required_and_health_is_open(client):
     assert client.get('/v1/capabilities').status_code == 401
     assert client.get('/v1/capabilities', headers={'Authorization': 'Bearer no'}).json()['error']['code'] == 'unauthorized'
-    assert client.get('/v1/health').json()['ready'] is True
+    health = client.get('/v1/health').json()
+    assert health['ready'] is True
+    assert health['backend'] == 'torch'
+    capabilities = client.get('/v1/capabilities', headers=H).json()
+    assert capabilities['backend'] == 'torch'
+    assert set(capabilities['available']) >= {'cpu', 'torch', 'mlx'}
+
+
+def test_mlx_is_reported_as_an_explicit_backend(tmp_path):
+    app = create_app(data=tmp_path, token='secret', engine_python=ENGINE_PY, fake=False,
+                     backend='mlx', fast_weights='', fast_mert='')
+    with TestClient(app) as c:
+        health = c.get('/v1/health').json()
+    assert health['requested_backend'] == 'mlx'
+    assert health['backend'] == 'mlx'
+    assert health['ready'] is False
+    assert 'backend_error' in health
 
 
 def test_audio_rules(client):
