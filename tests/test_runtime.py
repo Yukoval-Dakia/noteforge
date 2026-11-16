@@ -32,6 +32,23 @@ def test_explicit_unavailable_cuda_fails_closed():
         assert device == 'cuda'
 
 
+def test_cli_reports_an_unavailable_device_as_an_error_not_a_traceback():
+    """`--device cuda` on a host without CUDA exits with a message, not a stack trace."""
+    import importlib.util
+    import torch
+    if torch.cuda.is_available():
+        return
+    import noteforge.scripts.draft_song as draft_song
+    args = draft_song.parse_args(['--backend', 'torch', '--device', 'cuda', '--mode', 'phira', '--model', 'm.pt',
+                                  '--phira-level', '10', '--audio', 'a.wav', '--out-dir', '/tmp/x'])
+    try:
+        draft_song.run(args)
+    except SystemExit as exc:
+        assert 'CUDA was requested' in str(exc)
+    else:
+        raise AssertionError('run() should refuse an unavailable device')
+
+
 def test_mlx_backend_use_is_reported_without_claiming_metal_as_a_torch_device():
     try:
         from noteforge.mlx import draft_mlx

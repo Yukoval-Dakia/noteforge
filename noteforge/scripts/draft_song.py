@@ -704,7 +704,10 @@ def run(args, *, extractor=None, decoder=None):
     """Execute one draft (or extraction) and return the receipt; ``extractor`` / ``decoder`` are injectable."""
     started = time.monotonic()
     requested_device = args.device or 'auto'
-    device = resolve_torch_device(requested_device)
+    try:
+        device = resolve_torch_device(requested_device)
+    except RuntimeError as exc:  # an unavailable explicit device is a CLI error, not a traceback
+        raise SystemExit(f'--device {requested_device}: {exc}') from None
     changed_threads = configure_torch(getattr(args, 'cpu_threads', None), getattr(args, 'cpu_interop_threads', None))
     args.device = device
     if getattr(args, 'mert_device', None) == 'auto':
