@@ -1,6 +1,7 @@
 import json
 
 import numpy as np
+import pytest
 
 from noteforge.backends import resolve_backend, resolve_torch_device
 from noteforge.model.local_song_rollout import _device_rows
@@ -175,3 +176,79 @@ def test_auto_uses_discovered_mlx_assets_but_an_explicit_path_still_wins(tmp_pat
     assert (found.backend, found.device) == ('mlx', 'mlx')
     explicit = backends.resolve_backend('auto', 'cpu', None, None, root=tmp_path)
     assert explicit.backend == 'torch'
+
+
+def test_kind_bias_rule_maps_phira_types_to_their_kind_tokens():
+    """``--flick-ratio/--drag-ratio`` steer decode through ``kind_bias``; the batch loops take it too."""
+    from noteforge.model.full_event_codec import EventVocabulary
+    from noteforge.model.full_event_generate import _kind_bias_rule
+    vocab = EventVocabulary()
+    rule = _kind_bias_rule(type('M', (), {'vocab': vocab})(), dict(flick=2.5, drag=-1.0))
+    assert rule == {vocab.token('kind', 2): 2.5, vocab.token('kind', 3): -1.0}
+    assert _kind_bias_rule(type('M', (), {'vocab': vocab})(), None) is None
+
+
+def test_kind_bias_rule_rejects_unknown_types_and_non_finite_values():
+    import pytest
+    from noteforge.model.full_event_codec import EventVocabulary
+    from noteforge.model.full_event_generate import _kind_bias_rule
+    model = type('M', (), {'vocab': EventVocabulary()})()
+    with pytest.raises(ValueError, match='unknown Phira type'):
+        _kind_bias_rule(model, dict(slide=1.))
+    with pytest.raises(ValueError, match='finite'):
+        _kind_bias_rule(model, dict(flick=float('nan')))
+
+
+def _tiny_inputs(rows=1, length=4, taps=2, bands=2, dim=16):
+    import torch
+    local = torch.randn(rows, taps, length, bands, dim)
+    return dict(local=local, local_times=torch.zeros(rows, length), local_valid=torch.ones(rows, length, dtype=torch.bool),
+                song=torch.zeros(rows, 1, dim), song_times=torch.zeros(rows, 1),
+                song_valid=torch.ones(rows, 1, dtype=torch.bool),
+                reference=torch.zeros(rows, 2, 16), reference_times=torch.zeros(rows, 2),
+                reference_valid=torch.zeros(rows, 2, dtype=torch.bool),
+                controls=torch.zeros(rows, 8, 6), mode=torch.ones(rows, dtype=torch.long))
+
+
+def _tiny_model():
+    import torch
+    from noteforge.model.full_event_codec import EventVocabulary
+    from noteforge.model.full_event_model import FullEventConfig, FullEventModel
+    torch.manual_seed(0)
+    config = FullEventConfig(d=16, heads=2, kv_heads=1, ffn=32, encoder_layers=1, decoder_layers=1,
+                             tap_dim=16, taps=2, bands=2, band_slots=1, reference_dim=16, controls=8, dropout=0.)
+    return FullEventModel(config, EventVocabulary()).eval()
+
+
+@pytest.mark.parametrize('fast', [True, False])
+def test_kind_bias_changes_the_drawn_type_in_both_decode_loops(fast):
+    """A large bias on one Phira type must change the decoded events, not just be accepted."""
+    import torch
+    from noteforge.model.full_event_codec import EventRequest
+    from noteforge.model.full_event_generate import generate_batch
+    model = _tiny_model()
+    vocab = model.vocab
+    # Drive the grammar by hand so the run reaches the ``kind`` phase and writes
+    # notes, then rank tap just above flick on every step. The only thing that
+    # can flip the drawn type is the decode-time bias under test.
+    calls = {'n': 0}
+    def head(_module, _inputs, output):
+        output.zero_()
+        step = calls['n']
+        calls['n'] += 1
+        output[..., vocab.token('group', 1 if step < 30 else 0)] = 10.0
+        output[..., vocab.token('kind', 0)] = 1.0   # tap wins without a bias
+        output[..., vocab.token('kind', 2)] = 0.5   # flick overtakes tap with bias >= 1
+        return output
+    model.output.register_forward_hook(head)
+    request = EventRequest('phira', 0, 8_000_000, 8_000_000)
+    inputs = _tiny_inputs()
+    common = dict(max_tokens=60, temperature=None, fast=fast, cuda_graph=False)
+    plain = generate_batch(model, inputs, [request], **common)[0]
+    calls['n'] = 0
+    biased = generate_batch(model, inputs, [request], kind_bias=dict(flick=2.0), **common)[0]
+    plain_types = [e['type'] for e in plain['events']]
+    biased_types = [e['type'] for e in biased['events']]
+    assert plain_types, 'the controlled run must write notes to be a meaningful check'
+    assert plain_types == ['tap'] * len(plain_types)
+    assert biased_types == ['flick'] * len(biased_types)

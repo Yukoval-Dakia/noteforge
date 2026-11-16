@@ -8,11 +8,14 @@ to override. Without --level the planner also guesses the level, which passed it
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
+
+from noteforge.planner import plan_song
 
 HERE = Path(__file__).resolve().parent
 FIELD_TEMPERATURE = '{"kind": 1.0, "head_block": 0.7, "head_cell": 0.7, "head_ms": 0.7}'
@@ -83,11 +86,11 @@ def main(argv=None):
         a.add_argument(f'--{name}-ratio', type=float)
     a.add_argument('--opening-chart', type=Path, help='the charter\'s own chart of at least the opening (.osu for mania, RPE or official .json for Phira): style from its first 30 s')
     a.add_argument('--features-dir', type=Path, required=True)
-    a.add_argument('--planner-dir', type=Path, default=Path('planner'))
+    a.add_argument('--planner-dir', type=Path, default=plan_song.default_planner_dir())
     a.add_argument('--model', type=Path, required=True)
     a.add_argument('--plan', type=Path, required=True)
     a.add_argument('--out-dir', type=Path, required=True)
-    a.add_argument('--device', default='cuda')
+    a.add_argument('--device', default=os.environ.get('NOTEFORGE_DEVICE', 'auto'))
     a.add_argument('--batch-size', type=int, default=64)
     a.add_argument('--seed', type=int, default=0)
     a.add_argument('--max-wall-s', type=float, default=1200.)

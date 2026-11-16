@@ -40,6 +40,47 @@ pip install -e '.[api]'
 # 系统依赖：ffmpeg / ffprobe
 ```
 
+## 一个入口：noteforge CLI
+
+安装后只有一个命令，所有能力都在它下面。每个子命令把自己的参数原样交给对应模块，所以 `noteforge draft --help` 与 `draft_song --help` 完全一致，不会丢掉任何选项。
+
+```bash
+noteforge doctor      # 自检并说明缺什么（--fix 构建 MLX 导出）
+noteforge extract     # 只提取可复用特征，然后停下（= draft --extract-only）
+noteforge plan        # 只规划分段密度曲线，不出谱
+noteforge draft       # 生成谱面草稿（默认 auto：Apple Silicon 走 MLX，否则 PyTorch）
+noteforge auto        # 计划 + 出谱 + 可选 BPM 对齐，一条命令跑完
+noteforge bench       # 在固定输入上测一个后端，输出事件 SHA 便于比对
+noteforge fixture     # 写合成特征夹具，用于不含歌曲/编码器的基准
+noteforge export      # 把 r5 导出为 MLX fp16（或以 bf16 导出 MERT 前端）
+noteforge serve       # 启动 HTTP API（= uvicorn noteforge_api.asgi:app）
+noteforge version     # 打印版本
+```
+
+典型流程：
+
+```bash
+noteforge doctor --fix                 # 首次：检查环境，Apple Silicon 顺带建好 MLX 导出
+noteforge extract --audio song.mp3 --features-dir ./features/song --out-dir ./work/feat \
+  --mert-source hf
+noteforge draft --audio song.mp3 --features-dir ./features/song --out-dir ./work/song \
+  --model models/noteforge-r5.pt --plan models/config/r5-inference.json \
+  --mode phira --phira-level 10 --consensus 8
+noteforge serve                        # 需要先设置 NOTEFORGE_API_TOKEN
+```
+
+`noteforge auto` 适合不想分两步的用法：它先用规划器给出密度曲线（以及 Phira 的类型份额），再用单样本、history 和自己前一段出谱；带 `--bpm` 时先跑一遍取得相位，再回到最终一次。
+
+Phira 的 `--flick-ratio` / `--drag-ratio` 是解码期偏好（`kind_bias`），不是模型输出；`--kind-as-band` 则把份额作为请求带给模型。两种后端、`continuous`/`grouped`/`legacy` 三种调度都应用同一条规则，回执的 `decoding.kind_bias` 记录实际生效值。实测：同一 8 秒输入、同一 seed，torch CPU 与 mlx 在 `--flick-ratio 0.9` 下输出完全相同的事件哈希。
+
+```bash
+noteforge auto --audio song.mp3 --mode phira --level 6 --bpm 174 \
+  --features-dir ./features/song --model models/noteforge-r5.pt \
+  --plan models/config/r5-inference.json --out-dir ./work/song
+```
+
+`noteforge serve` 在缺少 `NOTEFORGE_API_TOKEN` 或未安装 `uvicorn` 时以退出码 2 报错并说明原因，不会静默起一个没有鉴权的服务。`noteforge export mlx` 的输出与 `doctor --fix` 写出的目录逐字节一致（同一权重会得到同一 `weights.safetensors` SHA-256）。`noteforge help <command>` 与 `noteforge <command> --help` 等价。原有的 `python -m noteforge.scripts.<name>`、`python -m noteforge.planner.<name>` 与 `noteforge-doctor` 入口继续可用。
+
 ## 环境自检：doctor
 
 安装后先跑一次自检，它会检查 ffmpeg/ffprobe、依赖、权重 SHA-256、MERT 源和可用后端，并说明缺什么：

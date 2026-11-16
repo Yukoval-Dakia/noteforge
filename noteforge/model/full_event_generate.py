@@ -1,6 +1,7 @@
 """Batched cached free generation; one device/host decision transfer per step."""
 import contextlib
 from dataclasses import asdict
+import math
 import os
 import time
 import warnings
@@ -221,6 +222,25 @@ def _encode_shared(model, inputs, memory_index):
             for k, v in memory.items()}
 
 
+def _kind_bias_rule(model, kind_bias):
+    """Validated ``kind_bias`` ``{phira type: bias}`` -> ``{token id: bias}`` (None = off).
+
+    The same decode-time preference ``ContinuousDecoder`` applies: a logit add
+    while a row sits in the ``kind`` phase. It is a knob, never a model output.
+    """
+    if not kind_bias:
+        return None
+    rule = {}
+    for name, value in kind_bias.items():
+        if name not in TYPES:
+            raise ValueError(f'kind_bias names unknown Phira type {name!r}; choose from {TYPES}')
+        bias = float(value)
+        if not math.isfinite(bias):
+            raise ValueError(f'kind_bias[{name!r}] must be finite, got {value!r}')
+        rule[model.vocab.token('kind', TYPES.index(name))] = bias
+    return rule or None
+
+
 def _pattern_rule(constraints):
     """Validated decode-time mania pattern constraints (``None`` = off).
 
@@ -289,7 +309,7 @@ def generate_batch(model, inputs, requests, max_tokens, *, deadline=None,
                    temperature=None, top_p=None, generator=None,
                    guidance=None, unconditional_inputs=None, field_temperature=None,
                    onset_fusion=None, fast=None, cuda_graph=None, stats=None, pattern_constraints=None,
-                   memory_index=None, autocast=None, compile_decode=False, on_step=None):
+                   memory_index=None, autocast=None, compile_decode=False, on_step=None, kind_bias=None):
     """Free generation over the legal grammar.
 
     temperature=None (default) is the historical greedy argmax over legal
@@ -322,6 +342,10 @@ def generate_batch(model, inputs, requests, max_tokens, *, deadline=None,
     tail-padded to a stable length so CUDA graphs survive batch changes. ``autocast``: None (fp32,
     default) or 'bf16'. ``compile_decode``: torch.compile the eager decode step (no CUDA graphs).
     ``on_step``: called once per fast-loop step (progress heartbeat).
+
+    ``kind_bias`` (default None): ``{type: bias}`` added to the legal logits while the row is in
+    the ``kind`` phase, the same preference knob ``ContinuousDecoder`` applies. This is a
+    decode-time steer, not a model output, and it is recorded by the caller.
     """
     expected_rows = len(inputs['mode']) if memory_index is None else len(memory_index)
     if model.training or len(requests) != expected_rows or not requests or max_tokens < 1:
@@ -340,6 +364,9 @@ def generate_batch(model, inputs, requests, max_tokens, *, deadline=None,
     patterns = _pattern_rule(pattern_constraints)
     if patterns is not None:
         decoding['pattern_constraints'] = dict(patterns, counts={})
+    kind = _kind_bias_rule(model, kind_bias)
+    if kind is not None:
+        decoding['kind_bias'] = dict(kind)
     row_generators = _row_generators(generator, len(requests))
     rng_mode = (None if temperature is None else 'per_row' if row_generators is not None
                 else 'shared_batch_generator' if generator is not None else 'global_torch_rng')
@@ -349,7 +376,7 @@ def generate_batch(model, inputs, requests, max_tokens, *, deadline=None,
                    guidance=guidance, unconditional_inputs=unconditional_inputs,
                    field_temperature=field_temperature, decoding=decoding,
                    row_generators=row_generators, rng_mode=rng_mode, fusion=fusion, patterns=patterns,
-                   memory_index=memory_index)
+                   memory_index=memory_index, kind=kind)
     with _autocast_context(inputs['local'].device, autocast):
         if fast and fast_supported(model):
             if cuda_graph is None:
@@ -380,7 +407,7 @@ def fast_supported(model):
 
 def _generate_reference(model, inputs, requests, max_tokens, *, deadline, temperature, top_p, generator,
                         guidance, unconditional_inputs, field_temperature, decoding, row_generators, rng_mode,
-                        fusion=None, patterns=None, memory_index=None):
+                        fusion=None, patterns=None, memory_index=None, kind=None):
     """Historical per-token loop (the equivalence reference for the fast path)."""
     states = [EventState(request, model.vocab) for request in requests]
     failures = [None] * len(states)
@@ -423,6 +450,15 @@ def _generate_reference(model, inputs, requests, max_tokens, *, deadline, temper
             bias = _fusion_matrix(states, active, tables, fusion['weight'], longest)
             if bias is not None:
                 scores = scores + torch.from_numpy(bias).to(scores.device)
+        if kind is not None:
+            scores = scores.float()
+            for row, (state, enabled) in enumerate(zip(states, active)):
+                if not enabled or state.phase != 'kind':
+                    continue
+                for column in range(len(legal[row])):
+                    add = kind.get(int(indices[row, column]))
+                    if add:
+                        scores[row, column] += add
         if temperature is None:
             # Repeating the first legal token for support padding cannot create
             # an illegal winner; ties keep the first occurrence (scalar argmax).
@@ -717,7 +753,7 @@ def _support_spec(tokens):
 def _generate_fast(model, inputs, requests, max_tokens, *, deadline, temperature, top_p, generator,
                    guidance, unconditional_inputs, field_temperature, decoding, row_generators, rng_mode,
                    cuda_graph=False, stats=None, fusion=None, patterns=None, memory_index=None, compile_decode=False,
-                   on_step=None):
+                   on_step=None, kind=None):
     """Same decisions as ``_generate_reference`` with fixed-shape device work.
 
     Per step: one host->device copy of (prev token, field, time), one decode
@@ -824,6 +860,15 @@ def _generate_fast(model, inputs, requests, max_tokens, *, deadline, temperature
             scores = scores.float()
             if bias is not None:
                 scores = scores + torch.from_numpy(bias).to(scores.device)
+        if kind is not None:
+            scores = scores.float()
+            for row, (state, enabled) in enumerate(zip(states, active)):
+                if not enabled or state.phase != 'kind':
+                    continue
+                for column in range(int(counts[row])):
+                    add = kind.get(int(index[row, column]))
+                    if add:
+                        scores[row, column] += add
         if temperature is None:
             choice = scores.argmax(-1).cpu().numpy()
         else:

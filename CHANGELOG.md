@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.1.0
+
+- Added the unified `noteforge` console script with subcommands `doctor`,
+  `draft`, `extract`, `plan`, `auto`, `bench`, `fixture`, `export`, `serve`,
+  and `version`. It is a thin forwarder, so every subcommand keeps its module's
+  own parser and option list (`noteforge draft --help` equals
+  `draft_song --help`). `noteforge help <cmd>` and `noteforge <cmd> --help` both
+  work.
+- `noteforge extract` is `draft_song --extract-only` with the flag injected when
+  absent; `noteforge serve` wraps `uvicorn noteforge_api.asgi:app` and exits 2
+  with a clear message when `NOTEFORGE_API_TOKEN` or `uvicorn` is missing.
+- `noteforge plan` exposes the density planner, `noteforge auto` runs the
+  plan-draft-BPM pipeline, and `noteforge export mlx|mlx-mert` performs the
+  one-time MLX exports. A re-export of the published r5 weights reproduces the
+  existing `models/mlx-fast/weights.safetensors` byte for byte.
+- `plan_song.py` and `auto_draft.py` now accept an argument list, default
+  `--device` to `auto` and the planner folder to the published
+  `models/planner_f`, so they work on Apple Silicon without CUDA or a `planner`
+  symlink.
+- Fixed `--flick-ratio` / `--drag-ratio` on every non-continuous decode path.
+  The `kind_bias` decode steer existed only in `ContinuousDecoder`, so the MLX
+  backend and `--scheduler grouped|legacy` raised
+  `TypeError: generate_batch() got an unexpected keyword argument 'kind_bias'`
+  instead of applying the caller's type ratio. `generate_batch` now accepts the
+  bias and applies it in both the fast and reference loops, and the scheduler
+  restriction is gone. On one real 8 s Apple Silicon input, `torch` CPU and
+  `mlx` returned the identical event hash with `--flick-ratio 0.9`
+  (`70c8ff39464dbebc`); the same input changed from 33 taps/5 drags/2 holds to
+  14 flicks/16 taps/3 holds. The receipt now records the applied bias.
+- `noteforge version` now reports the package source version rather than stale
+  installed metadata from an editable install.
+
 ## 1.0.1
 
 - Added `python -m noteforge.scripts.doctor` (and the `noteforge-doctor`

@@ -3,7 +3,7 @@
   plan_song.py --features-dir DIR --audio-sha SHA --mode phira --density 6 --out curve.json
 Omit --density to let the planner guess the overall level too (weaker on the frozen validation panel).
 """
-import argparse, json, sys
+import argparse, json, os, sys
 from pathlib import Path
 import numpy as np
 import torch
@@ -13,6 +13,15 @@ from noteforge.planner import extract
 from noteforge.planner.model import EPS, Planner
 
 STYLE = ('hold_ratio', 'chord_ratio', 'flick_ratio', 'drag_ratio')
+
+
+def default_planner_dir():
+    """The published planner under models/planner_f, or NOTEFORGE_PLANNER_DIR."""
+    env = os.environ.get('NOTEFORGE_PLANNER_DIR')
+    if env:
+        return Path(env)
+    published = HERE.parents[1]/'models/planner_f'
+    return published if published.is_dir() else Path('planner')
 
 
 def plan(cells, is_phira, density, net, mean, std, device):
@@ -28,17 +37,20 @@ def plan(cells, is_phira, density, net, mean, std, device):
     return d, dict(zip(STYLE, torch.sigmoid(style[0]).cpu().tolist()))
 
 
-def main():
+def main(argv=None):
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument('--features-dir', type=Path, required=True)
     a.add_argument('--audio-sha', required=True)
     a.add_argument('--mode', choices=('mania_4k', 'phira'), required=True)
     a.add_argument('--density', type=float, help='requested overall notes per second')
-    a.add_argument('--planner-dir', type=Path, default=Path('planner'))
+    a.add_argument('--planner-dir', type=Path, default=default_planner_dir())
     a.add_argument('--tag', default='f')
-    a.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
+    a.add_argument('--device', default=os.environ.get('NOTEFORGE_DEVICE', 'auto'))
     a.add_argument('--out', type=Path, required=True)
-    args = a.parse_args()
+    args = a.parse_args(argv)
+    if args.device == 'auto':
+        from noteforge.backends import resolve_torch_device
+        args.device = resolve_torch_device('auto')
     d = args.planner_dir
     saved = torch.load(d/f'planner_{args.tag}_{args.mode}.pt', map_location=args.device, weights_only=False)
     cfg = saved['cfg']

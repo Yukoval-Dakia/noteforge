@@ -834,8 +834,6 @@ def run(args, *, extractor=None, decoder=None):
         song_id = f'draft:{audio_sha[:16]}'
         song = dict(chart_id=song_id, audio_sha256=audio_sha, mode=args.mode, duration_us=duration_us)
         args.kind_bias = kind_bias(args)
-        if args.kind_bias and args.scheduler != 'continuous':
-            raise SystemExit('--flick-ratio / --drag-ratio need --scheduler continuous')
         generator = wb.make_generator(temperature, args.top_p, seeds[0], args.field_temperature,
                                       wb.decode_options(args), guidance=guidance)
         intensity = None
@@ -856,6 +854,7 @@ def run(args, *, extractor=None, decoder=None):
             rule='greedy' if temperature is None else 'ancestral', temperature=temperature, top_p=args.top_p,
             field_temperature=args.field_temperature, seeds=seeds, samples=len(seeds),
             rng='per-row torch.Generator seeded from (seed, mode, duration, core start)',
+            kind_bias=dict(args.kind_bias) or None,
             aggregation='single sample' if len(seeds) == 1 else f'consensus_{len(seeds)} (D6)',
             consensus=None if len(seeds) == 1 else dict(
                 samples=len(seeds), window_ms=wb.CONSENSUS_WINDOW_US//1000, min_votes=math.ceil(len(seeds)/2),
