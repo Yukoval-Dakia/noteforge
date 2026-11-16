@@ -214,6 +214,6 @@ python -m noteforge.scripts.bench_backends \
 
 ## 许可证与归属
 
-仓库代码、随仓小权重和发布的 r5 主权重采用 MIT License，见 `LICENSE`。第三方组件及许可见 `NOTICE`：PupuM2D（MIT）、MERT-v2-FullSong（Apache-2.0）、librosa（ISC）、timm 参考实现（Apache-2.0）。第三方谱面和音频不在本仓库，也不因代码许可获得再分发或训练授权。
+仓库代码、随仓小权重和发布的 r5 主权重采用 MIT License，见 `LICENSE`。第三方组件及许可见 `NOTICE`：PupuM2D（MIT）、librosa（ISC）、timm 参考实现（Apache-2.0）。MERT-v2-FullSong 是例外：仓库只包含加载它的代码，不分发其权重；上游固定 revision 的权重许可是 **CC BY-NC 4.0（非商用）**，不是 Apache-2.0，需要 MERT 的运行因此仅限非商用。第三方谱面和音频不在本仓库，也不因代码许可获得再分发或训练授权。
 
 训练方法、训练代码、语料和内部评测不属于本开源发布范围。

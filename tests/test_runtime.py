@@ -252,3 +252,57 @@ def test_kind_bias_changes_the_drawn_type_in_both_decode_loops(fast):
     assert plain_types, 'the controlled run must write notes to be a meaningful check'
     assert plain_types == ['tap'] * len(plain_types)
     assert biased_types == ['flick'] * len(biased_types)
+
+
+def test_mlx_mert_export_accepts_hf_and_validates_what_it_downloads(tmp_path, monkeypatch):
+    """`export mlx-mert --mert-source hf` must resolve the pinned revision, not crash.
+
+    Regression: `resolve_mert_source('hf')` returns a None directory (it means
+    "use the pinned Hugging Face revision"), which was passed straight into
+    Path() and raised TypeError.
+    """
+    import hashlib
+    import sys
+    import types
+    from noteforge.mlx import mert_fast
+    snapshot = tmp_path/'snapshot'
+    snapshot.mkdir()
+    for name in ('config.json', 'configuration_mert2.py', 'modeling_mert2.py'):
+        (snapshot/name).write_text(name)
+    (snapshot/'model.safetensors').write_bytes(b'weights')
+    expected = {name: hashlib.sha256((snapshot/name).read_bytes()).hexdigest()
+                for name in ('config.json', 'configuration_mert2.py', 'modeling_mert2.py', 'model.safetensors')}
+    monkeypatch.setattr('noteforge.audio.mert2.LOCAL_SOURCE_SHA256', expected)
+    calls = {}
+    fake_hub = types.ModuleType('huggingface_hub')
+    def snapshot_download(repo, revision=None, allow_patterns=None):
+        calls.update(repo=repo, revision=revision, allow=sorted(allow_patterns))
+        return str(snapshot)
+    fake_hub.snapshot_download = snapshot_download
+    monkeypatch.setitem(sys.modules, 'huggingface_hub', fake_hub)
+    found = mert_fast.source_dir('hf')
+    assert found == snapshot
+    assert calls['repo'] == 'm-a-p/MERT-v2-FullSong'
+    assert calls['revision'] == '7001f7657276238629e61c7746ce70735e0604c0'
+    # A local directory still wins and is never downloaded.
+    calls.clear()
+    assert mert_fast.source_dir(str(snapshot)) == snapshot
+    assert calls == {}
+
+
+def test_mlx_mert_export_rejects_a_source_whose_pinned_files_changed(tmp_path, monkeypatch):
+    import sys
+    import types
+    from noteforge.mlx import mert_fast
+    snapshot = tmp_path/'snapshot'
+    snapshot.mkdir()
+    for name in ('config.json', 'configuration_mert2.py', 'modeling_mert2.py', 'model.safetensors'):
+        (snapshot/name).write_text('not the pinned file')
+    monkeypatch.setattr('noteforge.audio.mert2.LOCAL_SOURCE_SHA256',
+                        {name: '0'*64 for name in ('config.json', 'configuration_mert2.py',
+                                                   'modeling_mert2.py', 'model.safetensors')})
+    fake_hub = types.ModuleType('huggingface_hub')
+    fake_hub.snapshot_download = lambda *a, **k: str(snapshot)
+    monkeypatch.setitem(sys.modules, 'huggingface_hub', fake_hub)
+    with pytest.raises(ValueError, match='identity changed'):
+        mert_fast.source_dir('hf')

@@ -194,11 +194,10 @@ def run_fix(report, args):
         report.add('fix', 'ok', f'wrote {backends.MLX_FAST_DIR}')
     if mert is None:
         try:
-            source = ds.resolve_mert_source(args.mert_source)[0]
+            mert_fast.export(args.mert_source, ROOT/backends.MLX_MERT_DIR)
         except SystemExit as exc:
             report.add('fix', 'warn', f'MLX MERT export skipped: {exc}')
             return
-        mert_fast.export(str(source), ROOT/backends.MLX_MERT_DIR)
         report.add('fix', 'ok', f'wrote {backends.MLX_MERT_DIR}')
 
 

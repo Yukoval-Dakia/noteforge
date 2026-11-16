@@ -8,11 +8,17 @@ Audio frontend
 - PupuM2D (sizigi/PupuM2D), MIT License. The mel front-end recipe in
   noteforge/audio/preprocess.py follows the published PupuM2D magnitude
   log-mel contract (24 kHz, periodic Hann window, Slaney mel filter).
-- MERT-v2-FullSong (m-a-p/MERT-v2-FullSong on Hugging Face), Apache-2.0.
-  noteforge/audio/mert2.py loads the pinned revision
-  7001f7657276238629e61c7746ce70735e0604c0 and verifies the local snapshot by
-  SHA-256. The encoder weights are NOT distributed in this repository; users
-  supply them locally.
+- MERT-v2-FullSong (m-a-p/MERT-v2-FullSong on Hugging Face). The checkpoint
+  weights at the pinned revision 7001f7657276238629e61c7746ce70735e0604c0 are
+  licensed CC BY-NC 4.0 (non-commercial), not Apache-2.0; see that repository's
+  LICENSE. Its modeling code is distributed under its own terms.
+  noteforge/audio/mert2.py loads that pinned revision and verifies the local
+  snapshot by SHA-256. The encoder weights are NOT distributed in this
+  repository and no MERT weight file is redistributed here; users fetch them
+  from the upstream repository and supply them locally. Because those weights
+  are non-commercial, NoteForge releases that require MERT are for
+  non-commercial use only. The published r5 checkpoint is an original NoteForge
+  artifact under MIT; its own license does not relicense MERT.
 
 Derived routines
 - The Slaney mel-filter routine follows librosa 0.11.0 (ISC License).

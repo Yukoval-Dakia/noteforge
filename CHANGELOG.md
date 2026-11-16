@@ -34,6 +34,17 @@
   14 flicks/16 taps/3 holds. The receipt now records the applied bias.
 - `noteforge version` now reports the package source version rather than stale
   installed metadata from an editable install.
+- Fixed `noteforge export mlx-mert --mert-source hf`, which raised
+  `TypeError: argument should be a str or an os.PathLike object ... not 'NoneType'`:
+  `resolve_mert_source('hf')` returns a `None` directory to mean "use the pinned
+  Hugging Face revision", and that `None` was passed straight into `Path`. The
+  export now downloads that exact revision with `huggingface_hub` and validates
+  the four pinned SHA-256 files before writing anything. `doctor --fix` uses the
+  same path.
+- Corrected the MERT-v2-FullSong license in `NOTICE` and the README: the pinned
+  checkpoint weights are CC BY-NC 4.0 (non-commercial), not Apache-2.0. The
+  repository distributes loading code only and no MERT weight file, so runs that
+  need MERT are non-commercial. The MIT r5 license does not relicense MERT.
 
 ## 1.0.1
 

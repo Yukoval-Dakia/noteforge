@@ -14,11 +14,28 @@ import torch
 from noteforge.scripts import draft_song as ds
 
 
+def source_dir(source_arg):
+    """The pinned MERT-v2 snapshot as a local directory.
+
+    ``--mert-source hf`` means "use the pinned Hugging Face revision"; for the
+    export we need its files on disk, so download that exact revision first.
+    The four exported files are checked against their pinned SHA-256 either way.
+    """
+    from noteforge.audio.mert2 import LOCAL_SOURCE_SHA256, REPO, REVISION, validate_local_source
+    directory = ds.resolve_mert_source(source_arg)[0]
+    if directory is None:
+        try:
+            from huggingface_hub import snapshot_download
+        except ImportError as exc:
+            raise SystemExit('--mert-source hf needs huggingface_hub; pip install huggingface_hub') from exc
+        directory = snapshot_download(REPO, revision=REVISION, allow_patterns=sorted(LOCAL_SOURCE_SHA256))
+    validate_local_source(directory)
+    return Path(directory)
+
+
 def export(source_arg, out):
     from safetensors.torch import load_file, save_file
-    from noteforge.audio.mert2 import validate_local_source
-    source = ds.resolve_mert_source(source_arg)[0]
-    validate_local_source(source)
+    source = source_dir(source_arg)
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     state = load_file(str(Path(source)/'model.safetensors'))
