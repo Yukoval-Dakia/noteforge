@@ -99,6 +99,31 @@ taken, so this repository publishes **no CUDA performance number**. The code
 paths and the fail-closed capability checks exist; real CUDA figures require a
 run on an NVIDIA host.
 
+To produce those figures on a machine that has a GPU, run the same benchmark
+tool the other backends use, once with graphs and once without, and once with
+bf16 and once without:
+
+```bash
+python -m noteforge.scripts.make_bench_fixture --out bench --seconds 8
+
+python -m noteforge.scripts.bench_backends --backend torch --device cuda \
+  --audio bench/silence.wav --features-dir bench --mode phira --level 10 \
+  --batch-size 64 --scheduler grouped --runs 3 --out-dir results/cuda-graph
+
+python -m noteforge.scripts.bench_backends --backend torch --device cuda --no-cuda-graph \
+  --audio bench/silence.wav --features-dir bench --mode phira --level 10 \
+  --batch-size 64 --scheduler grouped --runs 3 --out-dir results/cuda-eager
+
+python -m noteforge.scripts.bench_backends --backend torch --device cuda --autocast bf16 \
+  --audio bench/silence.wav --features-dir bench --mode phira --level 10 \
+  --batch-size 64 --scheduler grouped --runs 3 --out-dir results/cuda-bf16
+```
+
+`--device cuda` on a host without CUDA now exits with a one-line error instead of
+a traceback. Each run prints model load, generation, tokens, notes and the note
+multiset SHA, so a CUDA graph run and an eager run can be shown to produce the
+same events before any speed claim is made.
+
 ## x86_64 CPU
 
 x86_64 and ARM64 share the PyTorch inference contract but not the kernel

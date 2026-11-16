@@ -20,7 +20,7 @@ from .full_event_codec import BOS, EventState, FastEventState
 # is checked once against the eager step and any capture error or mismatch
 # falls back to eager (same buffers, same results). NOTEFORGE_DECODE_CUDA_GRAPH=0
 # or cuda_graph=False disables it. Verify a new GPU image with
-# scripts/bench_generate_speed.py --check.
+# python -m noteforge.scripts.bench_backends on that machine.
 FAST_DEFAULT = os.environ.get('NOTEFORGE_FAST_DECODE', '1') != '0'
 CUDA_GRAPH_DEFAULT = os.environ.get('NOTEFORGE_DECODE_CUDA_GRAPH', '1') != '0'
 
