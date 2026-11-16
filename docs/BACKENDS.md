@@ -252,6 +252,37 @@ ARM64 host was about 3.6-4.2x faster here. These are different hardware classes
 same-input sanity check that the two CPU paths agree on the output, not as a
 like-for-like CPU benchmark.
 
+### x86_64 second runner, and the numerical paths
+
+A second `cpu-x86-benchmark` run landed on a different machine class: Intel Xeon
+6975P-C, 4 vCPU, torch 2.15.0+cpu (oneDNN), same synthetic 8 s fixture and
+`batch-size 64`.
+
+| cpu threads | runs | generation median s | range s |
+|---|---|---|---|
+| 1 | 3 | 17.102 | 17.083..17.137 |
+| 2 | 3 | 9.800 | 9.658..9.836 |
+| 4 | 3 | 9.871 | 9.854..9.932 |
+
+Numerical paths at 2 threads on the same runner:
+
+| path | generation median s | vs fast |
+|---|---|---|
+| fast decode (fp32) | 9.800 | — |
+| `--autocast bf16` | 17.032 | 1.74x slower |
+| `--reference-decode` | 11.208 | 1.14x slower |
+
+bf16 autocast is again *slower*, not faster, even though this CPU advertises
+`amx_bf16`, `amx_tile` and `avx512_fp16`; the eager per-step decode does not hit
+whatever kernel would make it pay off. Reference decode is slower than fast
+decode here, consistent with Apple ARM. Every arm produced the same
+`fd6563dd...` event SHA.
+
+Read these together with the AMD EPYC row above: the two GitHub x86 runners
+differ by roughly 1.8x at their best thread count (~9.8 s on Xeon vs ~17.5 s on
+EPYC), because the runner pool is not uniform. Any published x86_64 number has
+to name its runner.
+
 ## Reporting rules
 
 Any published backend performance statement must include the machine and CPU

@@ -30,6 +30,16 @@
       "mkldnn": true,
       "python": "3.12.16",
       "runner": "GitHub-hosted ubuntu-latest, workflow cpu-x86-benchmark.yml"
+    },
+    "x86_64_github_runner_intel": {
+      "machine": "x86_64",
+      "cpu": "Intel Xeon 6975P-C (4 vCPU allocated)",
+      "os": "Linux-7.0.0-1016-aws-x86_64-with-glibc2.43",
+      "torch": "2.15.0+cpu",
+      "mkldnn": true,
+      "python": "3.12.16",
+      "runner": "GitHub-hosted ubuntu-latest, second run (cpu-x86-benchmark.yml)",
+      "note": "A different machine class from the AMD EPYC row; absolute times are not comparable across the two runners."
     }
   },
   "x86_64": {
@@ -526,6 +536,64 @@
         }
       ],
       "conclusion": "On the same fixture and the same weights, the Apple ARM64 host generated about 3.6-4.2x faster than this shared x86_64 runner; both produced the identical event SHA. The two hosts are different hardware classes, so this is a same-input comparison, not a like-for-like CPU benchmark."
+    },
+    {
+      "name": "x86_64_cpu_second_runner_intel",
+      "fixture": "synthetic 8 s fixture (audio sha dc8dcdd5...)",
+      "backend": "torch",
+      "device": "cpu",
+      "batch_size": 64,
+      "scheduler": "grouped",
+      "mode": "phira",
+      "level": 10,
+      "runs_per_arm": 3,
+      "rows": [
+        {
+          "cpu_threads": 1,
+          "interop_threads": 1,
+          "runs": 3,
+          "generation_median_s": 17.1017,
+          "generation_range_s": [
+            17.0831,
+            17.1374
+          ],
+          "output_sha256": [
+            "fd6563dd3f9d54594ac4998145915b8947f422a81504670610bbe90a7f9d5bcc"
+          ]
+        },
+        {
+          "cpu_threads": 2,
+          "interop_threads": 1,
+          "runs": 3,
+          "generation_median_s": 9.7996,
+          "generation_range_s": [
+            9.6583,
+            9.8358
+          ],
+          "output_sha256": [
+            "fd6563dd3f9d54594ac4998145915b8947f422a81504670610bbe90a7f9d5bcc"
+          ]
+        },
+        {
+          "cpu_threads": 4,
+          "interop_threads": 1,
+          "runs": 3,
+          "generation_median_s": 9.8706,
+          "generation_range_s": [
+            9.8537,
+            9.9318
+          ],
+          "output_sha256": [
+            "fd6563dd3f9d54594ac4998145915b8947f422a81504670610bbe90a7f9d5bcc"
+          ]
+        }
+      ],
+      "numerical_paths": {
+        "fast_decode_2_threads_median_s": 9.7996,
+        "bf16_autocast_2_threads_median_s": 17.0319,
+        "reference_decode_2_threads_median_s": 11.208
+      },
+      "conclusion": "On this Intel Xeon runner 2 threads and 4 threads were equal-best (9.80 s / 9.87 s) and 1 thread was 17.1 s. bf16 autocast was ~1.7x slower than fp32 (17.03 s vs 9.80 s) even though the CPU advertises avx512_bf16; reference decode was ~1.14x slower than fast. All arms produced the identical event SHA."
     }
   ],
   "conclusions": [
@@ -540,6 +608,7 @@
     "Model construction on meta + assign=True cut weight loading from 1.338 s to ~0.52 s with bit-identical parameters.",
     "int8 dynamic quantization is unavailable on the Apple ARM PyTorch 2.15.0 build (NoQEngine); x86_64 may differ and must be measured there.",
     "x86_64 (AMD EPYC 9V74, 4 vCPU): 2 CPU threads were fastest on the synthetic 8 s fixture (17.49 s vs 18.55 s at 1 and 20.13 s at 4); thread tuning is host-specific, unlike the flat Apple ARM result.",
-    "Same synthetic fixture, same weights: Apple ARM64 ~4.8 s vs x86_64 4-vCPU runner 17.5-20.1 s, byte-identical events. Different hardware classes, same input."
+    "Same synthetic fixture, same weights: Apple ARM64 ~4.8 s vs x86_64 4-vCPU runner 17.5-20.1 s, byte-identical events. Different hardware classes, same input.",
+    "x86_64 second runner (Intel Xeon 6975P-C, 4 vCPU): 2/4 threads 9.80/9.87 s vs 1 thread 17.10 s; bf16 ~1.7x slower than fp32; reference decode ~1.14x slower than fast. Two GitHub x86 runners gave very different absolute times (AMD EPYC ~17.5 s vs Intel Xeon ~9.8 s at their best), so x86 absolute numbers are runner-specific and must state the runner."
   ]
 }
