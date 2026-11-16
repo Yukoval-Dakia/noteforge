@@ -50,7 +50,8 @@ jobs:
             done
           done
       - name: Summarize
-        run: python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import json, statistics
           rows = [json.loads(line) for line in open('results.jsonl') if line.startswith('{')]
           by_threads = {}
