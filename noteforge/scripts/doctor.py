@@ -189,8 +189,8 @@ def run_fix(report, args):
     if not checkpoint.is_file():
         report.add('fix', 'warn', f'cannot export MLX weights: {checkpoint} is missing')
         return
-    from noteforge.mlx import fast_model, mert_fast
     if weights is None:
+        from noteforge.mlx import fast_model
         fast_model.export(checkpoint, ROOT/backends.MLX_FAST_DIR)
         report.add('fix', 'ok', f'wrote {backends.MLX_FAST_DIR}')
     if mert is None:
@@ -201,6 +201,7 @@ def run_fix(report, args):
                        'or pass --download explicitly.')
             return
         try:
+            from noteforge.mlx import mert_fast
             mert_fast.export(args.mert_source, ROOT/backends.MLX_MERT_DIR)
         except SystemExit as exc:
             report.add('fix', 'warn', f'MLX MERT export skipped: {exc}')
