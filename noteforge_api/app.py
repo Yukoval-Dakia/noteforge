@@ -71,7 +71,14 @@ class Settings:
         self.fast_mert = over.get('fast_mert') or env('NOTEFORGE_FAST_MERT', '')
         self.mel_stats = str(over.get('mel_stats') or env('NOTEFORGE_MEL_STATS', ROOT/'models/config/mel-statistics.json'))
         self.warm_idle_s = float(over.get('warm_idle_s') or env('NOTEFORGE_WARM_IDLE_S', 300))  # unload the waiting model after this
-        self.target = resolve_backend(self.backend, self.device, self.fast_weights, self.fast_mert)
+        self.target = resolve_backend(self.backend, self.device, self.fast_weights, self.fast_mert, root=ROOT)
+        if self.target.backend == 'mlx' and not (self.fast_weights and self.fast_mert):
+            # auto found the conventional export folders; keep the resolved paths so the
+            # engine server and capabilities report where the weights actually are.
+            from noteforge.backends import discover_mlx_assets
+            found_weights, found_mert = discover_mlx_assets(ROOT)
+            self.fast_weights = str(self.fast_weights or found_weights or '')
+            self.fast_mert = str(self.fast_mert or found_mert or '')
         if not self.token:
             raise RuntimeError('NOTEFORGE_API_TOKEN is required')
 

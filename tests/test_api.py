@@ -19,7 +19,9 @@ OSU = (Path(__file__).parent/'fixture.osu').read_bytes()
 
 @pytest.fixture()
 def client(tmp_path):
-    app = create_app(data=tmp_path, token='secret', engine_python=ENGINE_PY, fake=True)
+    # torch/cpu keeps the fake-engine API tests independent of whether this host has
+    # an MLX export under models/mlx-fast (which `auto` would otherwise prefer).
+    app = create_app(data=tmp_path, token='secret', engine_python=ENGINE_PY, fake=True, backend='torch', device='cpu')
     with TestClient(app) as c:
         yield c
 
@@ -59,9 +61,12 @@ def test_token_is_required_and_health_is_open(client):
     assert set(capabilities['available']) >= {'cpu', 'torch', 'mlx'}
 
 
-def test_mlx_is_reported_as_an_explicit_backend(tmp_path):
+def test_mlx_is_reported_as_an_explicit_backend(tmp_path, monkeypatch):
+    """An explicit backend='mlx' never falls back to torch; with no export it fails closed."""
+    import noteforge.backends as backends
+    monkeypatch.setattr(backends, 'discover_mlx_assets', lambda root: (None, None))
     app = create_app(data=tmp_path, token='secret', engine_python=ENGINE_PY, fake=False,
-                     backend='mlx', fast_weights='', fast_mert='')
+                     backend='mlx', fast_weights='', fast_mert='', device='cpu')
     with TestClient(app) as c:
         health = c.get('/v1/health').json()
     assert health['requested_backend'] == 'mlx'

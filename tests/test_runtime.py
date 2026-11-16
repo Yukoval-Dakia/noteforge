@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from noteforge.backends import resolve_backend, resolve_torch_device
@@ -96,3 +98,80 @@ def test_meta_model_construction_matches_the_plain_path():
     left, right = dict(plain.named_parameters()), dict(meta.named_parameters())
     assert set(left) == set(right)
     assert all(torch.equal(left[k], right[k]) for k in left)
+
+
+def test_doctor_reports_a_missing_ffmpeg_without_crashing(monkeypatch):
+    from noteforge.scripts import doctor
+    monkeypatch.setattr(doctor.shutil, 'which', lambda name: None)
+    report = doctor.Report()
+    doctor.check_tools(report)
+    assert [c['check'] for c in report.checks] == ['tool.ffmpeg', 'tool.ffprobe']
+    assert all(c['status'] == 'fail' for c in report.checks)
+    assert report.ready is False
+
+
+def test_doctor_fails_on_a_manifest_hash_mismatch(tmp_path, monkeypatch):
+    from noteforge.scripts import doctor
+    (tmp_path/'weights.pt').write_bytes(b'not the published file')
+    manifest = tmp_path/'MANIFEST.json'
+    manifest.write_text(json.dumps(dict(main_weights='weights.pt', files=[
+        dict(path='weights.pt', sha256='0'*64, bytes=22)])))
+    monkeypatch.setattr(doctor, 'MANIFEST', manifest)
+    monkeypatch.setattr(doctor, 'ROOT', tmp_path)
+    report = doctor.Report()
+    doctor.check_manifest(report, verify_hashes=True)
+    assert report.checks[0]['status'] == 'fail'
+    assert 'do not match' in report.checks[0]['message']
+
+
+def test_doctor_fails_when_the_main_weights_are_absent(tmp_path, monkeypatch):
+    from noteforge.scripts import doctor
+    manifest = tmp_path/'MANIFEST.json'
+    manifest.write_text(json.dumps(dict(main_weights='models/big.pt', files=[
+        dict(path='models/big.pt', sha256='0'*64, bytes=10)])))
+    monkeypatch.setattr(doctor, 'MANIFEST', manifest)
+    monkeypatch.setattr(doctor, 'ROOT', tmp_path)
+    report = doctor.Report()
+    doctor.check_manifest(report, verify_hashes=True)
+    assert report.checks[0]['status'] == 'fail'
+    assert 'missing' in report.checks[0]['message']
+
+
+def test_doctor_ready_is_ok_when_every_check_passes():
+    from noteforge.scripts import doctor
+    report = doctor.Report()
+    report.add('a', 'info', 'text')
+    report.add('b', 'warn', 'text')
+    assert report.ready is True
+    assert report.status == 'warn'
+    report.add('c', 'fail', 'text')
+    assert report.ready is False
+
+
+def test_mlx_assets_are_discovered_from_the_conventional_folders(tmp_path):
+    import noteforge.backends as backends
+    for folder, names in ((backends.MLX_FAST_DIR, backends.MLX_WEIGHT_FILES),
+                          (backends.MLX_MERT_DIR, backends.MLX_MERT_FILES)):
+        target = tmp_path/folder
+        target.mkdir(parents=True)
+        for name in names:
+            (target/name).write_text('x')
+    weights, mert = backends.discover_mlx_assets(tmp_path)
+    assert weights == tmp_path/backends.MLX_FAST_DIR
+    assert mert == tmp_path/backends.MLX_MERT_DIR
+
+
+def test_auto_uses_discovered_mlx_assets_but_an_explicit_path_still_wins(tmp_path, monkeypatch):
+    import noteforge.backends as backends
+    for folder, names in ((backends.MLX_FAST_DIR, backends.MLX_WEIGHT_FILES),
+                          (backends.MLX_MERT_DIR, backends.MLX_MERT_FILES)):
+        target = tmp_path/folder
+        target.mkdir(parents=True)
+        for name in names:
+            (target/name).write_text('x')
+    monkeypatch.setattr(backends, 'apple_silicon', lambda: True)
+    monkeypatch.setattr(backends, 'mlx_available', lambda: True)
+    found = backends.resolve_backend('auto', 'auto', None, None, root=tmp_path)
+    assert (found.backend, found.device) == ('mlx', 'mlx')
+    explicit = backends.resolve_backend('auto', 'cpu', None, None, root=tmp_path)
+    assert explicit.backend == 'torch'

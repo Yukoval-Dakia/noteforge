@@ -10,6 +10,11 @@ BACKENDS = ('auto', 'torch', 'mlx')
 DEVICES = ('auto', 'cuda', 'mps', 'cpu')
 MLX_WEIGHT_FILES = ('meta.json', 'weights.safetensors', 'head.pt', 'vocab.pt')
 MLX_MERT_FILES = ('model.safetensors', 'config.json', 'configuration_mert2.py', 'modeling_mert2.py')
+# Conventional export locations: ``auto`` uses these when nothing is configured,
+# so an Apple Silicon user who followed the README gets MLX without setting any
+# environment variable. An explicit NOTEFORGE_FAST_WEIGHTS / --mlx-weights wins.
+MLX_FAST_DIR = 'models/mlx-fast'
+MLX_MERT_DIR = 'models/mlx-mert'
 
 
 @dataclass(frozen=True)
@@ -54,6 +59,20 @@ def mlx_assets_ready(fast_weights=None, fast_mert=None):
     return folder_has(fast_weights, MLX_WEIGHT_FILES) and folder_has(fast_mert, MLX_MERT_FILES)
 
 
+def discover_mlx_assets(root):
+    """The conventional MLX export folders under ``root``; (None, None) when either is absent.
+
+    This only reports what exists on disk. Whether MLX may actually run is still
+    decided by :func:`resolve_backend`, which also checks the platform and that
+    ``mlx`` imports.
+    """
+    root = Path(root)
+    weights, mert = root/MLX_FAST_DIR, root/MLX_MERT_DIR
+    if folder_has(weights, MLX_WEIGHT_FILES) and folder_has(mert, MLX_MERT_FILES):
+        return weights, mert
+    return None, None
+
+
 def torch_runtime():
     """Availability of the PyTorch devices without constructing or loading a model."""
     try:
@@ -78,9 +97,16 @@ def resolve_torch_device(requested='auto'):
     return requested
 
 
-def resolve_backend(requested_backend='auto', requested_device='auto', fast_weights=None, fast_mert=None):
+def resolve_backend(requested_backend='auto', requested_device='auto', fast_weights=None, fast_mert=None,
+                    root=None, autodiscover=True):
     requested_backend = _choice(requested_backend, BACKENDS, 'backend')
     requested_device = _choice(requested_device, DEVICES, 'device')
+    if autodiscover and root is not None and not (fast_weights and fast_mert):
+        # Fill in whatever was not configured from the conventional export folders;
+        # an explicit value always wins for its own folder.
+        found_weights, found_mert = discover_mlx_assets(root)
+        fast_weights = fast_weights or found_weights
+        fast_mert = fast_mert or found_mert
     if requested_backend == 'mlx' or (requested_backend == 'auto' and requested_device == 'auto'
                                       and apple_silicon() and mlx_available()
                                       and mlx_assets_ready(fast_weights, fast_mert)):

@@ -16,6 +16,10 @@ venv/
 *.safetensors
 *.onnx
 
+# Generated MLX exports (see `python -m noteforge.scripts.doctor --fix`).
+models/mlx-fast/
+models/mlx-mert/
+
 # Generated features, audio, charts, and local artifacts are not source.
 data/
 charts/

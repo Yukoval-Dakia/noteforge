@@ -2,6 +2,15 @@
 
 ## 1.0.1
 
+- Added `python -m noteforge.scripts.doctor` (and the `noteforge-doctor`
+  console script): it checks ffmpeg/ffprobe, the runtime dependencies, the
+  committed weight SHA-256, the MERT source and the resolved backend, exits 1
+  when the host cannot draft, and supports `--json` and `--fix`.
+- `--fix` builds the conventional MLX exports on Apple Silicon
+  (`models/mlx-fast`, `models/mlx-mert`); those directories are now gitignored.
+- `auto` now discovers those conventional export folders itself, so an Apple
+  Silicon user who ran `doctor --fix` gets MLX with no environment variables.
+  An explicit `NOTEFORGE_FAST_WEIGHTS` / `NOTEFORGE_FAST_MERT` still wins.
 - Renamed the Apple Silicon backend to `mlx` everywhere: package,
   environment variables, API backend value, dependency extra, requirements file
   and test entry. The old names are gone rather than kept as aliases.

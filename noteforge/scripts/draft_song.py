@@ -654,7 +654,9 @@ def parse_args(argv=None):
     p.add_argument('--features-dir', type=Path, help='persistent feature dir (reused when it holds this audio); '
                    'default: a temporary dir removed afterwards')
     p.add_argument('--extract-only', action='store_true', help='write the features (needs --features-dir) and stop')
-    p.add_argument('--mert-source', help="pinned MERT-v2 directory, or 'hf' to download the pinned revision")
+    p.add_argument('--mert-source', default=os.environ.get('NOTEFORGE_MERT_SOURCE'),
+                   help="pinned MERT-v2 directory, or 'hf' to download the pinned revision "
+                        '(or NOTEFORGE_MERT_SOURCE, the same variable the API reads)')
     p.add_argument('--mert-device', choices=('auto', 'cuda', 'mps', 'cpu'), help='default: --device')
     p.add_argument('--codec', help='audio codec name (ffprobe codec_name) when ffprobe is unavailable')
     p.add_argument('--clock-constant-ms', type=int, help='override the model->playback clock constant c')
@@ -977,10 +979,16 @@ def main(argv=None, *, extractor=None, decoder=None):
     args.argv = ['noteforge.scripts.draft_song', *raw]
     if args.backend in ('auto', 'mlx'):
         from noteforge.backends import resolve_backend
-        target = resolve_backend(args.backend, args.device, args.mlx_weights, args.mlx_mert)
+        target = resolve_backend(args.backend, args.device, args.mlx_weights, args.mlx_mert, root=ROOT)
         if target.backend == 'mlx':
             if not target.ready:
                 raise SystemExit(target.error)
+            if not (args.mlx_weights and args.mlx_mert):
+                # auto/MLX found the conventional export folders under the repo; use them.
+                from noteforge.backends import discover_mlx_assets
+                found_weights, found_mert = discover_mlx_assets(ROOT)
+                args.mlx_weights = args.mlx_weights or found_weights
+                args.mlx_mert = args.mlx_mert or found_mert
             stride = dict(fast='2', balanced='-2').get(args.mlx_plan)
             env = dict(MLX_FAST=str(args.mlx_weights), MLX_CACHE_MB=str(args.mlx_cache_mb),
                        NOTEFORGE_FAST_WEIGHTS=str(args.mlx_weights),

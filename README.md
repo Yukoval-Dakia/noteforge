@@ -40,22 +40,37 @@ pip install -e '.[api]'
 # 系统依赖：ffmpeg / ffprobe
 ```
 
+## 环境自检：doctor
+
+安装后先跑一次自检，它会检查 ffmpeg/ffprobe、依赖、权重 SHA-256、MERT 源和可用后端，并说明缺什么：
+
+```bash
+python -m noteforge.scripts.doctor          # 人类可读报告
+python -m noteforge.scripts.doctor --json   # 同样内容，JSON（可用于 CI）
+python -m noteforge.scripts.doctor --fix    # 还会构建 MLX 导出（Apple Silicon）
+```
+
+退出码 0 表示这台机器可以直接出谱，1 表示还缺必需项；`warn`/`info` 不影响退出码。`--fix` 只做能做的事：在 Apple Silicon 上按约定目录构建 `models/mlx-fast` 与 `models/mlx-mert`，然后重新解析后端。
+
 ## 推理后端
 
 | `NOTEFORGE_BACKEND` | 设备 | 实现 |
 |---|---|---|
-| `auto` | 自动 | Apple arm64 且配置了 MLX 导出权重时选 `mlx`，否则选 `torch` |
+| `auto` | 自动 | Apple arm64 且能用 MLX 导出时选 `mlx`，否则选 `torch` |
 | `mlx` | Apple Silicon | `mlx.core` fp16 静态缓存解码；MERT 前端使用 PyTorch MPS |
 | `torch` + `NOTEFORGE_DEVICE=auto` | CUDA / MPS / CPU | PyTorch，按 NVIDIA、Apple Metal、CPU 的顺序选择 |
 | `torch` + `NOTEFORGE_DEVICE=cuda` | NVIDIA | bf16 autocast（显式开启）、静态缓存和 CUDA Graph |
 | `torch` + `NOTEFORGE_DEVICE=cpu` | x86_64 / arm64 CPU | PyTorch CPU/oneDNN/Accelerate 路径，可控制线程数 |
 
-`mlx`、`mps`、`cuda` 和 `cpu` 是不同后端，不共用性能结论。`auto` 只有在 Apple arm64、已安装 `mlx` 且存在下面两套导出权重时才会选择 MLX。
+`mlx`、`mps`、`cuda` 和 `cpu` 是不同后端，不共用性能结论。`auto` 只有在 Apple arm64、已安装 `mlx` 且能用 MLX 导出时才会选 MLX；导出权重可以放在约定目录（`models/mlx-fast`、`models/mlx-mert`，`doctor --fix` 就写这里），也可以用 `NOTEFORGE_FAST_WEIGHTS` / `NOTEFORGE_FAST_MERT` 或 CLI 参数显式指定。显式指定的路径优先，`auto` 不会覆盖它。
 
 ### Apple Silicon MLX
 
 ```bash
 pip install -e '.[api,mlx]'
+
+# 一条命令导出两份 MLX 权重并自动检测
+python -m noteforge.scripts.doctor --fix
 
 # 主模型 fp16 MLX 导出
 python -m noteforge.mlx.fast_model export models/noteforge-r5.pt ./models/mlx-fast

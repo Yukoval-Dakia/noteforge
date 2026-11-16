@@ -25,6 +25,7 @@ mlx = ["mlx>=0.22"]
 
 [project.scripts]
 noteforge-draft = "noteforge.scripts.draft_song:main"
+noteforge-doctor = "noteforge.scripts.doctor:main"
 
 [tool.setuptools.packages.find]
 include = ["noteforge*", "noteforge_api*"]
